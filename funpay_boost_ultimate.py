@@ -518,21 +518,23 @@ class FunPayBooster:
                 self.logger.error("ChromeDriver not found in any expected location")
                 return False
             
-            # Enhanced Chrome startup with better error handling
+            # Simple Chrome startup
             def _start_chrome():
                 try:
-                    self.logger.info("Starting Chrome with enhanced compatibility settings...")
+                    self.logger.info("Starting Chrome with simple settings...")
                     
-                    # Create driver with enhanced configuration
-                    driver = webdriver.Chrome(service=service, options=chrome_options)
+                    # Create driver with minimal configuration
+                    options = Options()
+                    options.add_argument('--headless')
+                    options.add_argument('--no-sandbox')
+                    options.add_argument('--disable-dev-shm-usage')
+                    options.add_argument('--disable-gpu')
                     
-                    # Set enhanced timeouts for Selenium 4.x
-                    driver.set_page_load_timeout(90)  # Increased for stability
-                    driver.implicitly_wait(20)  # Increased implicit wait
+                    driver = webdriver.Chrome(options=options)
                     
-                    # Set window size for consistency
-                    width, height = self.browser_stealth.get_random_resolution()
-                    driver.set_window_size(width, height)
+                    # Set basic timeouts
+                    driver.set_page_load_timeout(60)
+                    driver.implicitly_wait(10)
                     
                     self.logger.info("Chrome driver created successfully")
                     return driver

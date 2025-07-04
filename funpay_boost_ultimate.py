@@ -12,6 +12,9 @@ import json
 import logging
 import signal
 import sys
+import random
+import hashlib
+import base64
 from datetime import datetime, timedelta
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
@@ -20,6 +23,298 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, WebDriverException
+from selenium.webdriver.common.action_chains import ActionChains
+
+class RateLimiter:
+    """Advanced Rate Limiting with adaptive delays"""
+    
+    def __init__(self):
+        self.request_history = []
+        self.base_delay = 2.0
+        self.max_delay = 30.0
+        self.burst_threshold = 3
+        self.cooldown_period = 300  # 5 minutes
+        self.adaptive_factor = 1.0
+        
+    def wait_if_needed(self, action_type="general"):
+        """Apply intelligent rate limiting based on recent activity"""
+        now = time.time()
+        
+        # Clean old entries
+        self.request_history = [t for t in self.request_history if now - t < self.cooldown_period]
+        
+        # Calculate adaptive delay
+        recent_requests = len(self.request_history)
+        
+        if recent_requests >= self.burst_threshold:
+            # Exponential backoff for burst protection
+            delay = min(self.base_delay * (2 ** (recent_requests - self.burst_threshold)), self.max_delay)
+            delay *= self.adaptive_factor
+            
+            # Add randomization to avoid detection patterns
+            jitter = random.uniform(0.5, 1.5)
+            final_delay = delay * jitter
+            
+            logging.info(f"Rate limiting: waiting {final_delay:.2f}s (recent requests: {recent_requests})")
+            time.sleep(final_delay)
+            
+            # Increase adaptive factor if we're hitting limits frequently
+            self.adaptive_factor = min(self.adaptive_factor * 1.1, 3.0)
+        else:
+            # Normal operation - small random delay
+            delay = random.uniform(1.0, 3.0)
+            time.sleep(delay)
+            
+            # Gradually reduce adaptive factor during normal operation
+            self.adaptive_factor = max(self.adaptive_factor * 0.95, 1.0)
+        
+        # Record this request
+        self.request_history.append(now)
+    
+    def add_human_delay(self, min_delay=0.5, max_delay=2.0):
+        """Add human-like random delays"""
+        delay = random.uniform(min_delay, max_delay)
+        time.sleep(delay)
+    
+    def reset_adaptive_factor(self):
+        """Reset adaptive factor after successful operations"""
+        self.adaptive_factor = 1.0
+
+class BrowserStealth:
+    """Advanced browser detection avoidance"""
+    
+    def __init__(self):
+        self.user_agents = [
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/115.0",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/116.0",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/117.0",
+            "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0",
+            "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/115.0"
+        ]
+        
+        self.screen_resolutions = [
+            (1920, 1080), (1366, 768), (1440, 900), (1536, 864), (1280, 720)
+        ]
+        
+        self.languages = ["en-US,en;q=0.9", "en-GB,en;q=0.9", "en;q=0.9"]
+        
+    def get_random_user_agent(self):
+        """Get a random user agent"""
+        return random.choice(self.user_agents)
+    
+    def get_random_resolution(self):
+        """Get a random screen resolution"""
+        return random.choice(self.screen_resolutions)
+    
+    def get_random_language(self):
+        """Get a random language preference"""
+        return random.choice(self.languages)
+    
+    def apply_stealth_settings(self, firefox_options):
+        """Apply comprehensive stealth settings to Firefox"""
+        width, height = self.get_random_resolution()
+        user_agent = self.get_random_user_agent()
+        language = self.get_random_language()
+        
+        # Basic stealth
+        firefox_options.set_preference("general.useragent.override", user_agent)
+        firefox_options.set_preference("dom.webdriver.enabled", False)
+        firefox_options.set_preference("useAutomationExtension", False)
+        firefox_options.set_preference("marionette.enabled", False)
+        
+        # Language and locale
+        firefox_options.set_preference("intl.accept_languages", language)
+        firefox_options.set_preference("intl.locale.requested", "en-US")
+        
+        # Screen and viewport
+        firefox_options.add_argument(f"--width={width}")
+        firefox_options.add_argument(f"--height={height}")
+        
+        # Advanced anti-detection
+        firefox_options.set_preference("privacy.resistFingerprinting", True)
+        firefox_options.set_preference("webgl.disabled", True)
+        firefox_options.set_preference("media.peerconnection.enabled", False)
+        firefox_options.set_preference("geo.enabled", False)
+        firefox_options.set_preference("dom.battery.enabled", False)
+        firefox_options.set_preference("device.sensors.enabled", False)
+        
+        # Memory and performance fingerprinting
+        firefox_options.set_preference("dom.maxHardwareConcurrency", 4)
+        firefox_options.set_preference("dom.w3c_touch_events.enabled", 0)
+        
+        # Network fingerprinting
+        firefox_options.set_preference("network.http.sendRefererHeader", 2)
+        firefox_options.set_preference("network.http.referer.spoofSource", True)
+        
+        # Canvas fingerprinting protection
+        firefox_options.set_preference("privacy.resistFingerprinting.block_mozAddonManager", True)
+        firefox_options.set_preference("extensions.webextensions.restrictedDomains", "")
+        
+        return firefox_options
+    
+    def add_stealth_scripts(self, driver):
+        """Add JavaScript to further hide automation"""
+        stealth_scripts = [
+            # Hide webdriver property
+            "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})",
+            
+            # Spoof plugins
+            """
+            Object.defineProperty(navigator, 'plugins', {
+                get: () => [1, 2, 3, 4, 5].map(() => ({
+                    0: {type: "application/x-google-chrome-pdf", suffixes: "pdf", description: "Portable Document Format", enabledPlugin: Plugin},
+                    description: "Portable Document Format",
+                    filename: "internal-pdf-viewer",
+                    length: 1,
+                    name: "Chrome PDF Plugin"
+                }))
+            });
+            """,
+            
+            # Spoof languages
+            f"Object.defineProperty(navigator, 'languages', {{get: () => ['{self.get_random_language().split(',')[0]}']}})",
+            
+            # Hide automation indicators
+            "window.chrome = { runtime: {} };",
+            "Object.defineProperty(navigator, 'permissions', { get: () => undefined });",
+            "Object.defineProperty(navigator, 'serviceWorker', { get: () => undefined });",
+        ]
+        
+        for script in stealth_scripts:
+            try:
+                driver.execute_script(script)
+            except Exception as e:
+                logging.debug(f"Failed to execute stealth script: {e}")
+    
+    def simulate_human_behavior(self, driver, element=None):
+        """Simulate human-like mouse movements and interactions"""
+        try:
+            actions = ActionChains(driver)
+            
+            if element:
+                # Move to element with human-like curve
+                actions.move_to_element_with_offset(element, 
+                    random.randint(-5, 5), random.randint(-5, 5))
+                
+                # Add small random movements
+                for _ in range(random.randint(1, 3)):
+                    actions.move_by_offset(random.randint(-2, 2), random.randint(-2, 2))
+                    actions.pause(random.uniform(0.1, 0.3))
+                
+                actions.pause(random.uniform(0.2, 0.8))
+                actions.click()
+            else:
+                # Random mouse movements
+                for _ in range(random.randint(2, 5)):
+                    x = random.randint(100, 800)
+                    y = random.randint(100, 600)
+                    actions.move_by_offset(x, y)
+                    actions.pause(random.uniform(0.5, 1.5))
+            
+            actions.perform()
+            
+        except Exception as e:
+            logging.debug(f"Human behavior simulation failed: {e}")
+
+class CircuitBreaker:
+    """Circuit breaker pattern for error recovery"""
+    
+    def __init__(self, failure_threshold=5, recovery_timeout=300, expected_exception=Exception):
+        self.failure_threshold = failure_threshold
+        self.recovery_timeout = recovery_timeout
+        self.expected_exception = expected_exception
+        self.failure_count = 0
+        self.last_failure_time = None
+        self.state = 'CLOSED'  # CLOSED, OPEN, HALF_OPEN
+        
+    def call(self, func, *args, **kwargs):
+        """Execute function with circuit breaker protection"""
+        if self.state == 'OPEN':
+            if self._should_attempt_reset():
+                self.state = 'HALF_OPEN'
+            else:
+                raise Exception("Circuit breaker is OPEN")
+        
+        try:
+            result = func(*args, **kwargs)
+            self._on_success()
+            return result
+        except self.expected_exception as e:
+            self._on_failure()
+            raise e
+    
+    def _should_attempt_reset(self):
+        """Check if enough time has passed to attempt reset"""
+        return (time.time() - self.last_failure_time) >= self.recovery_timeout
+    
+    def _on_success(self):
+        """Handle successful execution"""
+        self.failure_count = 0
+        self.state = 'CLOSED'
+    
+    def _on_failure(self):
+        """Handle failed execution"""
+        self.failure_count += 1
+        self.last_failure_time = time.time()
+        
+        if self.failure_count >= self.failure_threshold:
+            self.state = 'OPEN'
+            logging.warning(f"Circuit breaker opened after {self.failure_count} failures")
+
+class ErrorRecovery:
+    """Advanced error recovery with exponential backoff"""
+    
+    def __init__(self):
+        self.retry_counts = {}
+        self.max_retries = 5
+        self.base_delay = 1.0
+        self.max_delay = 300.0  # 5 minutes
+        self.backoff_factor = 2.0
+        
+    def execute_with_retry(self, func, operation_name, *args, **kwargs):
+        """Execute function with intelligent retry logic"""
+        retry_count = self.retry_counts.get(operation_name, 0)
+        
+        for attempt in range(self.max_retries):
+            try:
+                result = func(*args, **kwargs)
+                # Reset retry count on success
+                self.retry_counts[operation_name] = 0
+                return result
+                
+            except Exception as e:
+                retry_count += 1
+                self.retry_counts[operation_name] = retry_count
+                
+                if attempt == self.max_retries - 1:
+                    logging.error(f"Operation '{operation_name}' failed after {self.max_retries} attempts: {e}")
+                    raise e
+                
+                # Calculate delay with exponential backoff
+                delay = min(
+                    self.base_delay * (self.backoff_factor ** attempt),
+                    self.max_delay
+                )
+                
+                # Add jitter to prevent thundering herd
+                jitter = random.uniform(0.5, 1.5)
+                final_delay = delay * jitter
+                
+                logging.warning(f"Operation '{operation_name}' failed (attempt {attempt + 1}/{self.max_retries}): {e}")
+                logging.info(f"Retrying in {final_delay:.2f} seconds...")
+                
+                time.sleep(final_delay)
+        
+        return None
+    
+    def get_retry_count(self, operation_name):
+        """Get current retry count for an operation"""
+        return self.retry_counts.get(operation_name, 0)
+    
+    def reset_retry_count(self, operation_name):
+        """Reset retry count for an operation"""
+        self.retry_counts[operation_name] = 0
 
 class FunPayBooster:
     def __init__(self, config_file='/etc/funpay/config.json'):
@@ -30,6 +325,18 @@ class FunPayBooster:
         self.display_num = 111
         self.consecutive_errors = 0
         self.max_errors = 3
+        
+        # Rate Limiting & Error Recovery
+        self.rate_limiter = RateLimiter()
+        self.error_recovery = ErrorRecovery()
+        self.browser_stealth = BrowserStealth()
+        
+        # Circuit breaker for error recovery
+        self.circuit_breaker = CircuitBreaker(
+            failure_threshold=5,
+            recovery_timeout=1800,  # 30 minutes
+            expected_exception=Exception
+        )
         
         # Setup logging
         logging.basicConfig(
@@ -191,13 +498,16 @@ class FunPayBooster:
             return False
     
     def setup_firefox(self):
-        """Setup Firefox with all optimizations and fixes"""
+        """Setup Firefox with enhanced stealth and anti-detection"""
         try:
             if not self.setup_display():
                 return False
             
-            # Firefox options with all fixes applied
+            # Firefox options with stealth enhancements
             firefox_options = Options()
+            
+            # Apply stealth settings
+            firefox_options = self.browser_stealth.apply_stealth_settings(firefox_options)
             
             # Basic headless options
             firefox_options.add_argument("--headless")
@@ -208,13 +518,6 @@ class FunPayBooster:
             firefox_options.add_argument("--disable-extensions")
             firefox_options.add_argument("--disable-plugins")
             
-            # Anti-detection preferences
-            firefox_options.set_preference("dom.webdriver.enabled", False)
-            firefox_options.set_preference("useAutomationExtension", False)
-            firefox_options.set_preference("marionette.enabled", False)
-            firefox_options.set_preference("general.useragent.override", 
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/115.0")
-            
             # Performance optimizations
             firefox_options.set_preference("dom.ipc.processCount", 1)
             firefox_options.set_preference("security.sandbox.content.level", 0)
@@ -223,10 +526,11 @@ class FunPayBooster:
             firefox_options.set_preference("permissions.default.image", 2)
             firefox_options.set_preference("javascript.enabled", True)
             
-            # Timeout settings
-            firefox_options.set_preference("dom.max_script_run_time", 10)
-            firefox_options.set_preference("network.http.connection-timeout", 15)
-            firefox_options.set_preference("network.http.response.timeout", 15)
+            # Enhanced timeout settings with randomization
+            base_timeout = random.randint(15, 25)
+            firefox_options.set_preference("dom.max_script_run_time", base_timeout)
+            firefox_options.set_preference("network.http.connection-timeout", base_timeout)
+            firefox_options.set_preference("network.http.response.timeout", base_timeout)
             
             # Disable unnecessary features
             firefox_options.set_preference("browser.startup.homepage_override.mstone", "ignore")
@@ -235,21 +539,34 @@ class FunPayBooster:
             firefox_options.set_preference("browser.crashReports.unsubmittedCheck.enabled", False)
             firefox_options.set_preference("app.update.enabled", False)
             
-            # Create service
+            # Create service with random log level
+            log_levels = ['fatal', 'error', 'warn']
             service = Service(
                 executable_path='/usr/local/bin/geckodriver',
-                service_args=['--log', 'fatal']
+                service_args=['--log', random.choice(log_levels)]
             )
             
-            # Start Firefox
-            self.driver = webdriver.Firefox(service=service, options=firefox_options)
-            self.driver.set_page_load_timeout(20)
-            self.driver.implicitly_wait(5)
+            # Start Firefox with error recovery
+            def _start_firefox():
+                driver = webdriver.Firefox(service=service, options=firefox_options)
+                driver.set_page_load_timeout(random.randint(20, 30))
+                driver.implicitly_wait(random.randint(5, 10))
+                return driver
             
-            # Hide webdriver property
-            self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+            self.driver = self.error_recovery.execute_with_retry(
+                _start_firefox, "firefox_startup"
+            )
             
-            self.logger.info("Firefox driver initialized successfully")
+            if not self.driver:
+                return False
+            
+            # Apply stealth scripts
+            self.browser_stealth.add_stealth_scripts(self.driver)
+            
+            # Add human-like delay after startup
+            self.rate_limiter.add_human_delay(2.0, 5.0)
+            
+            self.logger.info("Firefox driver initialized successfully with stealth features")
             return True
             
         except Exception as e:
@@ -257,13 +574,21 @@ class FunPayBooster:
             return False
     
     def try_login_with_credentials(self):
-        """Try to login with username/password"""
+        """Try to login with username/password using enhanced stealth"""
         try:
             self.logger.info("Attempting login with credentials...")
             
-            # Navigate to login page
-            self.driver.get("https://funpay.com/en/account/login")
-            time.sleep(3)
+            # Apply rate limiting before login attempt
+            self.rate_limiter.wait_if_needed("login_attempt")
+            
+            # Navigate to login page with human-like behavior
+            def _navigate_to_login():
+                self.driver.get("https://funpay.com/en/account/login")
+                self.rate_limiter.add_human_delay(2.0, 4.0)
+                return True
+            
+            if not self.error_recovery.execute_with_retry(_navigate_to_login, "navigate_login"):
+                return False
             
             # Check for CAPTCHA
             page_source = self.driver.page_source.lower()
@@ -271,26 +596,47 @@ class FunPayBooster:
                 self.logger.warning("CAPTCHA detected on login page")
                 return False
             
-            # Fill login form
-            wait = WebDriverWait(self.driver, 10)
+            # Fill login form with human-like behavior
+            wait = WebDriverWait(self.driver, random.randint(10, 15))
             
+            # Find and fill username with human simulation
             username_field = wait.until(EC.presence_of_element_located((By.NAME, "login")))
+            self.browser_stealth.simulate_human_behavior(self.driver, username_field)
+            self.rate_limiter.add_human_delay(0.5, 1.5)
+            
             username_field.clear()
-            username_field.send_keys(self.config['username'])
+            # Type username character by character with random delays
+            for char in self.config['username']:
+                username_field.send_keys(char)
+                time.sleep(random.uniform(0.05, 0.15))
             
+            self.rate_limiter.add_human_delay(1.0, 2.0)
+            
+            # Find and fill password
             password_field = self.driver.find_element(By.NAME, "password")
+            self.browser_stealth.simulate_human_behavior(self.driver, password_field)
+            self.rate_limiter.add_human_delay(0.5, 1.5)
+            
             password_field.clear()
-            password_field.send_keys(self.config['password'])
+            # Type password with random delays
+            for char in self.config['password']:
+                password_field.send_keys(char)
+                time.sleep(random.uniform(0.05, 0.15))
             
-            # Submit form
+            self.rate_limiter.add_human_delay(1.0, 3.0)
+            
+            # Submit form with human-like behavior
             login_button = self.driver.find_element(By.XPATH, "//button[@type='submit']")
-            login_button.click()
+            self.browser_stealth.simulate_human_behavior(self.driver, login_button)
             
-            time.sleep(5)
+            # Wait for response with random delay
+            response_delay = random.uniform(3.0, 7.0)
+            time.sleep(response_delay)
             
             # Check login success
             if "login" not in self.driver.current_url.lower():
                 self.logger.info("✅ Login successful with credentials!")
+                self.rate_limiter.reset_adaptive_factor()
                 return True
             else:
                 page_source = self.driver.page_source.lower()
@@ -409,52 +755,84 @@ class FunPayBooster:
         return None
     
     def check_boost_status(self):
-        """Check boost status and perform boost if available"""
+        """Check boost status and perform boost if available with enhanced stealth"""
         try:
             self.logger.info("Checking boost status...")
             
-            # Navigate to boost page
-            self.driver.get(self.config['target_url'])
-            time.sleep(5)
+            # Apply rate limiting before boost check
+            self.rate_limiter.wait_if_needed("boost_check")
+            
+            # Navigate to boost page with error recovery
+            def _navigate_to_boost():
+                self.driver.get(self.config['target_url'])
+                self.rate_limiter.add_human_delay(3.0, 6.0)
+                return True
+            
+            if not self.error_recovery.execute_with_retry(_navigate_to_boost, "navigate_boost"):
+                return "error"
             
             # Check if redirected to login
             if "login" in self.driver.current_url.lower():
                 self.logger.warning("Redirected to login - cookies may have expired")
                 return "auth_failed"
             
-            # Look for boost button
-            boost_button = self.find_boost_button()
+            # Simulate human browsing behavior
+            self.browser_stealth.simulate_human_behavior(self.driver)
+            self.rate_limiter.add_human_delay(1.0, 3.0)
             
-            if boost_button:
-                self.logger.info("🎯 Boost button found!")
+            # Look for boost button with circuit breaker protection
+            def _find_and_click_boost():
+                boost_button = self.find_boost_button()
                 
-                # Click boost button
-                try:
-                    self.driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", boost_button)
-                    time.sleep(1)
-                    boost_button.click()
+                if boost_button:
+                    self.logger.info("���� Boost button found!")
+                    
+                    # Scroll to button with human-like behavior
+                    self.driver.execute_script(
+                        "arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", 
+                        boost_button
+                    )
+                    self.rate_limiter.add_human_delay(1.0, 2.0)
+                    
+                    # Simulate human interaction before clicking
+                    self.browser_stealth.simulate_human_behavior(self.driver, boost_button)
+                    
                     self.logger.info("🎉 Boost button clicked!")
                     
-                    time.sleep(5)
+                    # Wait for response with random delay
+                    response_delay = random.uniform(3.0, 8.0)
+                    time.sleep(response_delay)
                     
                     # Update last boost time
                     self.config['last_boost'] = datetime.now().isoformat()
                     self.save_config()
                     
                     return "success"
-                    
-                except Exception as e:
-                    self.logger.error(f"Failed to click boost button: {e}")
-                    return "click_failed"
-            else:
-                # Check for wait message
-                page_source = self.driver.page_source.lower()
-                if "wait" in page_source or "подожд" in page_source:
-                    self.logger.info("⏳ Must wait before next boost")
-                    return "wait"
                 else:
-                    self.logger.info("❌ No boost button found")
-                    return "no_button"
+                    return None
+            
+            try:
+                result = self.circuit_breaker.call(_find_and_click_boost)
+                if result:
+                    self.rate_limiter.reset_adaptive_factor()
+                    return result
+            except Exception as e:
+                self.logger.warning(f"Circuit breaker prevented boost attempt: {e}")
+                return "circuit_open"
+            
+            # Check for wait message with enhanced detection
+            page_source = self.driver.page_source.lower()
+            wait_indicators = [
+                "wait", "подожд", "cooldown", "timeout", "please wait",
+                "try again", "спробуйте", "повторите", "через"
+            ]
+            
+            if any(indicator in page_source for indicator in wait_indicators):
+                self.logger.info("⏳ Must wait before next boost")
+                return "wait"
+            else:
+                self.logger.info("❌ No boost button found")
+                return "no_button"
             
         except Exception as e:
             self.logger.error(f"Error checking boost status: {e}")
@@ -504,68 +882,139 @@ class FunPayBooster:
         
         self.logger.info("✅ Boost monitoring started successfully!")
         
-        # Main monitoring loop
+        # Main monitoring loop with enhanced error handling
         while True:
             try:
+                # Apply rate limiting before each boost check cycle
+                self.rate_limiter.wait_if_needed("main_loop")
+                
                 result = self.check_boost_status()
                 
                 if result == "success":
                     wait_hours = self.config.get('boost_interval', 3)
-                    next_time = datetime.now() + timedelta(hours=wait_hours)
+                    # Add randomization to boost interval to avoid detection patterns
+                    jitter_minutes = random.randint(-30, 30)
+                    wait_seconds = (wait_hours * 3600) + (jitter_minutes * 60)
+                    next_time = datetime.now() + timedelta(seconds=wait_seconds)
+                    
                     self.logger.info(f"✅ Boost successful! Next boost at: {next_time.strftime('%Y-%m-%d %H:%M:%S')}")
                     self.consecutive_errors = 0
+                    self.error_recovery.reset_retry_count("boost_operation")
                     
-                    # Sleep with periodic status updates
-                    for i in range(wait_hours):
-                        time.sleep(3600)  # 1 hour
-                        remaining = wait_hours - i - 1
-                        if remaining > 0:
-                            self.logger.info(f"⏰ {remaining} hours until next boost attempt")
+                    # Sleep with periodic status updates and random micro-breaks
+                    hours_to_wait = int(wait_seconds // 3600)
+                    remaining_seconds = wait_seconds % 3600
+                    
+                    for i in range(hours_to_wait):
+                        # Add random micro-breaks during waiting
+                        hour_sleep = 3600 + random.randint(-300, 300)  # ±5 minutes
+                        time.sleep(hour_sleep)
+                        
+                        remaining_hours = hours_to_wait - i - 1
+                        if remaining_hours > 0:
+                            self.logger.info(f"⏰ {remaining_hours} hours until next boost attempt")
+                    
+                    # Sleep remaining time
+                    if remaining_seconds > 0:
+                        time.sleep(remaining_seconds)
                 
                 elif result == "auth_failed":
-                    if self.handle_auth_failure():
+                    auth_retry_result = self.error_recovery.execute_with_retry(
+                        self.handle_auth_failure, "auth_recovery"
+                    )
+                    
+                    if auth_retry_result:
                         continue  # Try again immediately
                     else:
-                        self.logger.error("Re-authentication failed, waiting 1 hour...")
+                        self.logger.error("Re-authentication failed after retries, waiting 1 hour...")
                         time.sleep(3600)
                 
                 elif result == "wait":
-                    self.logger.info("⏳ Waiting 1 hour before next check...")
-                    time.sleep(3600)
+                    # Add randomization to wait time
+                    base_wait = 3600  # 1 hour
+                    jitter = random.randint(-600, 600)  # ±10 minutes
+                    wait_time = base_wait + jitter
+                    
+                    self.logger.info(f"⏳ Waiting {wait_time//60} minutes before next check...")
+                    time.sleep(wait_time)
+                
+                elif result == "circuit_open":
+                    self.logger.warning("Circuit breaker is open, waiting for recovery...")
+                    time.sleep(self.circuit_breaker.recovery_timeout)
                 
                 else:
                     self.consecutive_errors += 1
+                    
                     if self.consecutive_errors >= self.max_errors:
-                        self.logger.warning("Too many consecutive errors, restarting Firefox...")
-                        self.restart_firefox()
-                        self.consecutive_errors = 0
+                        self.logger.warning("Too many consecutive errors, attempting recovery...")
+                        
+                        recovery_result = self.error_recovery.execute_with_retry(
+                            self.restart_firefox, "firefox_recovery"
+                        )
+                        
+                        if recovery_result:
+                            self.consecutive_errors = 0
+                            self.logger.info("Recovery successful, continuing...")
+                        else:
+                            self.logger.error("Recovery failed, entering extended wait...")
+                            time.sleep(7200)  # 2 hours
                     else:
-                        self.logger.info(f"⏰ No action needed, checking again in 30 minutes... (error {self.consecutive_errors}/{self.max_errors})")
-                        time.sleep(1800)
+                        # Progressive backoff for errors
+                        wait_time = 1800 * (2 ** (self.consecutive_errors - 1))  # Exponential backoff
+                        wait_time = min(wait_time, 7200)  # Max 2 hours
+                        wait_time += random.randint(-300, 300)  # Add jitter
+                        
+                        self.logger.info(f"⏰ Error {self.consecutive_errors}/{self.max_errors}, waiting {wait_time//60} minutes...")
+                        time.sleep(wait_time)
                 
             except KeyboardInterrupt:
                 self.logger.info("🛑 Daemon stopped by user")
                 break
             except Exception as e:
                 self.logger.error(f"Unexpected error in main loop: {e}")
-                time.sleep(1800)
+                
+                # Use error recovery for unexpected errors
+                recovery_wait = self.error_recovery.execute_with_retry(
+                    lambda: random.randint(1800, 3600), "unexpected_error_recovery"
+                )
+                time.sleep(recovery_wait or 1800)
         
         return True
     
     def restart_firefox(self):
-        """Restart Firefox driver"""
+        """Restart Firefox driver with enhanced recovery"""
         try:
-            self.logger.info("Restarting Firefox...")
-            self.cleanup()
-            time.sleep(5)
+            self.logger.info("Restarting Firefox with enhanced recovery...")
             
-            if self.setup_firefox():
-                if self.setup_authentication():
-                    self.logger.info("✅ Firefox restarted successfully")
-                    return True
+            # Cleanup with error recovery
+            def _cleanup():
+                self.cleanup()
+                # Add random delay to avoid detection patterns
+                cleanup_delay = random.uniform(5.0, 15.0)
+                time.sleep(cleanup_delay)
+                return True
             
-            self.logger.error("❌ Failed to restart Firefox")
-            return False
+            self.error_recovery.execute_with_retry(_cleanup, "cleanup_operation")
+            
+            # Setup Firefox with circuit breaker protection
+            def _setup_and_auth():
+                if self.setup_firefox():
+                    if self.setup_authentication():
+                        return True
+                return False
+            
+            result = self.circuit_breaker.call(_setup_and_auth)
+            
+            if result:
+                self.logger.info("✅ Firefox restarted successfully with enhanced recovery")
+                # Reset error counters on successful restart
+                self.consecutive_errors = 0
+                self.error_recovery.reset_retry_count("firefox_restart")
+                self.rate_limiter.reset_adaptive_factor()
+                return True
+            else:
+                self.logger.error("❌ Failed to restart Firefox")
+                return False
             
         except Exception as e:
             self.logger.error(f"Error restarting Firefox: {e}")

@@ -304,16 +304,7 @@ netstat -tulpn | grep python
 
 ### Common Issues and Solutions
 
-#### 1. **ModuleNotFoundError: No module named 'selenium'**
-```bash
-# Quick fix
-sudo bash quick_fix.sh
-
-# Or install manually
-sudo python3 -m pip install selenium requests beautifulsoup4 lxml
-```
-
-#### 2. **ChromeDriver not found**
+#### 1. **ChromeDriver not found**
 ```bash
 # Install ChromeDriver
 sudo wget -O /tmp/chromedriver.zip "https://storage.googleapis.com/chrome-for-testing-public/138.0.7204.92/linux64/chromedriver-linux64.zip"
@@ -322,7 +313,7 @@ sudo mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/
 sudo chmod +x /usr/local/bin/chromedriver
 ```
 
-#### 3. **Chrome not starting**
+#### 2. **Chrome not starting**
 ```bash
 # Install Chrome
 wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
@@ -334,14 +325,14 @@ sudo apt install -y google-chrome-stable
 google-chrome --version
 ```
 
-#### 4. **Permission denied errors**
+#### 3. **Permission denied errors**
 ```bash
 # Fix permissions
 sudo chown -R $USER:$USER /path/to/FunPay_Auto_Boost_Offers
 chmod +x *.sh
 ```
 
-#### 5. **Rate Limiting Too Aggressive**
+#### 4. **Rate Limiting Too Aggressive**
 ```python
 # Edit funpay_boost_ultimate.py
 # In RateLimiter class, adjust:
@@ -349,7 +340,7 @@ self.base_delay = 1.0  # Reduce base delay
 self.burst_threshold = 5  # Increase threshold
 ```
 
-#### 6. **Browser Detection Issues**
+#### 5. **Browser Detection Issues**
 ```bash
 # Check stealth features are working
 grep "stealth" /var/log/funpay/boost.log
@@ -358,7 +349,7 @@ grep "stealth" /var/log/funpay/boost.log
 grep "user agent" /var/log/funpay/boost.log
 ```
 
-#### 7. **Service won't start**
+#### 6. **Service won't start**
 ```bash
 # Check service status
 sudo systemctl status funpay-boost
@@ -394,71 +385,6 @@ chromedriver --version
 xvfb-run --help
 ```
 
-#### Dependency Check
-```bash
-# Run dependency installer to verify
-sudo bash install_dependencies.sh
-```
-
-## 📚 Documentation and Files
-
-### 📁 Project Files
-- `funpay_boost_ultimate.py` - Main application with enhanced features
-- `install_dependencies.sh` - Complete dependency installation script
-- `quick_fix.sh` - Quick dependency fix for common issues
-- `cleanup_funpay.sh` - Complete cleanup and removal script
-- `ENHANCED_FEATURES.md` - Detailed guide for new features
-- `CLEANUP_COMMANDS.md` - Manual cleanup instructions
-
-### 📖 Documentation
-- [Enhanced Features Guide](ENHANCED_FEATURES.md) - Rate limiting, stealth, and error recovery
-- [Cleanup Guide](CLEANUP_COMMANDS.md) - Complete removal instructions
-- [Installation Troubleshooting](#-troubleshooting) - Common issues and solutions
-
-## 🔄 Version History
-
-### v2.1.0 - Chrome Integration Version
-- ✅ **Migrated from Firefox to Google Chrome** for better stability
-- ✅ **ChromeDriver compatibility** with automatic version detection
-- ✅ **Simplified browser setup** with reduced timeout issues
-- ✅ **Enhanced error handling** for Chrome-specific issues
-- ✅ **Updated installation scripts** for Chrome dependencies
-- ✅ **Improved performance** and reliability
-
-### v2.0.0 - Enhanced Ultimate Version
-- ✅ Advanced Rate Limiting with adaptive delays
-- ✅ Browser Detection Avoidance with stealth features
-- ✅ Advanced Error Recovery with circuit breaker
-- ✅ Complete installation and cleanup scripts
-- ✅ Enhanced logging and monitoring
-- ✅ Human behavior simulation
-- ✅ Automatic dependency management
-
-### v1.0.0 - Basic Version
-- ✅ Basic boost functionality
-- ✅ Simple configuration
-- ✅ Basic error handling
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-### 🐛 Bug Reports
-Please include:
-- OS version and Python version
-- Error messages and logs
-- Steps to reproduce
-- Expected vs actual behavior
-
-### 💡 Feature Requests
-- Describe the feature clearly
-- Explain the use case
-- Consider implementation complexity
-
 ## ⚠️ Disclaimer
 
 This tool is for **educational purposes only**. Users are responsible for:
@@ -468,10 +394,6 @@ This tool is for **educational purposes only**. Users are responsible for:
 
 **Use at your own risk.** The developers are not responsible for any consequences of using this tool.
 
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
 ## 🙏 Acknowledgments
 
 - **Selenium WebDriver team** - For the excellent automation framework
@@ -479,14 +401,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Python community** - For amazing libraries and tools
 - **Contributors and testers** - For feedback and improvements
 - **Open source community** - For inspiration and best practices
-
-## 📞 Support
-
-### 🆘 Getting Help
-1. Check the [Troubleshooting](#-troubleshooting) section
-2. Review [Enhanced Features Guide](ENHANCED_FEATURES.md)
-3. Search existing [Issues](https://github.com/B3hnamR/FunPay_Auto_Boost_Offers/issues)
-4. Create a new issue with detailed information
 
 ### 📈 Project Stats
 - **Language**: Python 3.8+

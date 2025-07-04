@@ -32,9 +32,9 @@ python3 -m pip install --upgrade pip
 echo "📦 Installing Python packages..."
 python3 -m pip install selenium requests beautifulsoup4 lxml
 
-# Install GeckoDriver
+# Install GeckoDriver (compatible with Firefox 140.x)
 echo "📦 Installing GeckoDriver..."
-wget -q -O /tmp/geckodriver.tar.gz "https://github.com/mozilla/geckodriver/releases/download/v0.34.0/geckodriver-v0.34.0-linux64.tar.gz"
+wget -q -O /tmp/geckodriver.tar.gz "https://github.com/mozilla/geckodriver/releases/download/v0.36.0/geckodriver-v0.36.0-linux64.tar.gz"
 tar -xzf /tmp/geckodriver.tar.gz -C /usr/local/bin/
 chmod +x /usr/local/bin/geckodriver
 rm -f /tmp/geckodriver.tar.gz

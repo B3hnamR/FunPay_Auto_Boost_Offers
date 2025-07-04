@@ -121,8 +121,8 @@ echo -e "${GREEN}✅ Firefox dependencies installed${NC}"
 echo ""
 echo -e "${YELLOW}📦 Step 4: Installing GeckoDriver...${NC}"
 
-# Get latest GeckoDriver version
-GECKODRIVER_VERSION="v0.34.0"
+# Get compatible GeckoDriver version for Firefox 140.x
+GECKODRIVER_VERSION="v0.36.0"
 GECKODRIVER_URL="https://github.com/mozilla/geckodriver/releases/download/${GECKODRIVER_VERSION}/geckodriver-${GECKODRIVER_VERSION}-linux64.tar.gz"
 
 echo -e "${CYAN}Downloading GeckoDriver $GECKODRIVER_VERSION...${NC}"

@@ -7,6 +7,178 @@
 [![Platform](https://img.shields.io/badge/Platform-Linux-orange.svg)](https://linux.org)
 [![Status](https://img.shields.io/badge/Status-Active-brightgreen.svg)](https://github.com/B3hnamR/FunPay_Auto_Boost_Offers)
 
+## 📋 **All Available Commands:**
+
+### **🔧 Background Management:**
+
+```bash
+# Start in background (recommended)
+python3 funpay_boost_ultimate.py --start
+
+# Stop background process
+python3 funpay_boost_ultimate.py --stop
+
+# Restart service
+python3 funpay_boost_ultimate.py --restart
+
+# Show complete status
+python3 funpay_boost_ultimate.py --status
+```
+
+### **⚙️ Setup and Testing:**
+
+```bash
+# Initial setup (credentials, URL, interval)
+python3 funpay_boost_ultimate.py --setup
+
+# One-time test (check functionality)
+python3 funpay_boost_ultimate.py --test
+
+# Run in foreground (legacy)
+python3 funpay_boost_ultimate.py --daemon
+```
+
+### **🎯 Interactive Menu:**
+
+```bash
+# Run without parameters - selection menu
+python3 funpay_boost_ultimate.py
+```
+
+---
+
+## 🚀 **How to Start (Step by Step):**
+
+### **Step 1: Initial Setup**
+
+```bash
+python3 funpay_boost_ultimate.py --setup
+```
+
+**Enter:**
+- 📧 FunPay Email
+- 🔒 Password
+- 🔗 Boost page URL
+- ⏰ Time interval (default 3 hours)
+
+### **Step 2: Test Functionality**
+
+```bash
+python3 funpay_boost_ultimate.py --test
+```
+
+**Expected result:** `Test result: success`
+
+### **Step 3: Start in Background**
+
+```bash
+python3 funpay_boost_ultimate.py --start
+```
+
+---
+
+## 📊 **Management and Monitoring:**
+
+### **Check Status:**
+
+```bash
+python3 funpay_boost_ultimate.py --status
+```
+
+### **View Live Logs:**
+
+```bash
+# Main log
+tail -f /var/log/funpay/boost.log
+
+# Background log
+tail -f /var/log/funpay/background.log
+```
+
+### **Stop Service:**
+
+```bash
+python3 funpay_boost_ultimate.py --stop
+```
+
+---
+
+## 🎯 **Complete Start Example:**
+
+```bash
+# 1. Go to project folder
+cd ~/FunPay_Auto_Boost_Offers
+
+# 2. Initial setup
+python3 funpay_boost_ultimate.py --setup
+
+# 3. Test
+python3 funpay_boost_ultimate.py --test
+
+# 4. Start in background
+python3 funpay_boost_ultimate.py --start
+
+# 5. Check status
+python3 funpay_boost_ultimate.py --status
+```
+
+---
+
+## 🔄 **Management Commands:**
+
+### **Restart:**
+
+```bash
+python3 funpay_boost_ultimate.py --restart
+```
+
+### **Complete Cleanup:**
+
+```bash
+sudo bash cleanup_funpay.sh
+```
+
+### **Check Process:**
+
+```bash
+ps aux | grep funpay_boost_ultimate
+```
+
+---
+
+## 💡 **Important Notes:**
+
+### **✅ Recommended:**
+- Always use `--start` (background mode)
+- Test with `--test` before starting
+- Check status with `--status`
+
+### **⚠️ If you have problems:**
+
+```bash
+# Stop and restart
+python3 funpay_boost_ultimate.py --stop
+python3 funpay_boost_ultimate.py --start
+
+# Or restart
+python3 funpay_boost_ultimate.py --restart
+```
+
+---
+
+## 🎯 **Quick Summary:**
+
+```bash
+# Quick start (3 commands)
+python3 funpay_boost_ultimate.py --setup    # Setup
+python3 funpay_boost_ultimate.py --test     # Test
+python3 funpay_boost_ultimate.py --start    # Start
+```
+
+**Now the script works in background and automatically boosts every 3 hours!** 🚀
+
+---
+
 ## ✨ Key Features
 
 ### 🛡️ Advanced Rate Limiting
@@ -107,21 +279,6 @@ sudo chmod +x /usr/local/bin/chromedriver
 python3 funpay_boost_ultimate.py --setup
 ```
 
-### ⚙️ Configuration
-```bash
-# Interactive setup (first time)
-python3 funpay_boost_ultimate.py --setup
-
-# Check current status
-python3 funpay_boost_ultimate.py --status
-
-# Test functionality
-python3 funpay_boost_ultimate.py --test
-
-# Run as daemon
-python3 funpay_boost_ultimate.py --daemon
-```
-
 ### 🔧 Chrome Version Compatibility
 
 The project uses **Google Chrome** with **ChromeDriver** for automation. Make sure you have compatible versions:
@@ -201,32 +358,15 @@ sudo chmod +x /usr/local/bin/chromedriver
 - Error recovery attempts
 - Circuit breaker activations
 
-## 🛠️ Advanced Usage
+## 🧹 Complete Cleanup
 
-### Command Line Options
-```bash
-# Setup configuration
-python3 funpay_boost_ultimate.py --setup
-
-# Show current status
-python3 funpay_boost_ultimate.py --status
-
-# Test boost functionality
-python3 funpay_boost_ultimate.py --test
-
-# Run as daemon
-python3 funpay_boost_ultimate.py --daemon
-```
-
-### 🧹 Complete Cleanup
-
-#### Quick Cleanup
+### Quick Cleanup
 ```bash
 # Remove all components automatically
 sudo bash cleanup_funpay.sh
 ```
 
-#### Manual Cleanup
+### Manual Cleanup
 ```bash
 # Stop and remove service
 sudo systemctl stop funpay-boost
@@ -241,7 +381,7 @@ sudo userdel funpay
 sudo pkill -f "funpay\|chrome\|chromedriver\|Xvfb"
 ```
 
-#### One-Line Cleanup
+### One-Line Cleanup
 ```bash
 # Complete removal in one command
 sudo systemctl stop funpay-boost && sudo systemctl disable funpay-boost && sudo rm -f /etc/systemd/system/funpay-boost.service && sudo rm -rf /opt/funpay-boost /etc/funpay /var/log/funpay /home/funpay && sudo userdel funpay 2>/dev/null && sudo pkill -9 -f "funpay\|chrome\|chromedriver\|Xvfb" && echo "✅ FunPay Auto Boost completely removed!"

@@ -50,17 +50,33 @@
 git clone https://github.com/B3hnamR/FunPay_Auto_Boost_Offers.git
 cd FunPay_Auto_Boost_Offers
 
-# Install dependencies automatically
-sudo bash quick_fix.sh
+# Install Chrome and dependencies
+wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+sudo apt update
+sudo apt install -y python3 python3-pip google-chrome-stable xvfb
+
+# Install Python packages
+sudo python3 -m pip install selenium requests beautifulsoup4 lxml
+
+# Install ChromeDriver
+sudo wget -O /tmp/chromedriver.zip "https://storage.googleapis.com/chrome-for-testing-public/138.0.7204.92/linux64/chromedriver-linux64.zip"
+sudo unzip /tmp/chromedriver.zip -d /tmp/
+sudo mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/
+sudo chmod +x /usr/local/bin/chromedriver
 
 # Setup and run
 python3 funpay_boost_ultimate.py --setup
 ```
 
-#### Method 2: Complete Installation
+#### Method 2: Alternative Installation
 ```bash
-# For full installation with all features
-sudo bash install_dependencies.sh
+# For systems with different Chrome versions
+# Check your Chrome version first
+google-chrome --version
+
+# Download compatible ChromeDriver from:
+# https://storage.googleapis.com/chrome-for-testing-public/
 
 # Setup the service
 python3 funpay_boost_ultimate.py --setup
@@ -70,15 +86,22 @@ python3 funpay_boost_ultimate.py --setup
 ```bash
 # Install system dependencies
 sudo apt update -y
-sudo apt install -y python3 python3-pip firefox xvfb
+sudo apt install -y python3 python3-pip xvfb
+
+# Install Google Chrome
+wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+sudo apt update
+sudo apt install -y google-chrome-stable
 
 # Install Python packages
 sudo python3 -m pip install selenium requests beautifulsoup4 lxml
 
-# Install GeckoDriver
-sudo wget -O /tmp/geckodriver.tar.gz "https://github.com/mozilla/geckodriver/releases/download/v0.34.0/geckodriver-v0.34.0-linux64.tar.gz"
-sudo tar -xzf /tmp/geckodriver.tar.gz -C /usr/local/bin/
-sudo chmod +x /usr/local/bin/geckodriver
+# Install ChromeDriver
+sudo wget -O /tmp/chromedriver.zip "https://storage.googleapis.com/chrome-for-testing-public/138.0.7204.92/linux64/chromedriver-linux64.zip"
+sudo unzip /tmp/chromedriver.zip -d /tmp/
+sudo mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/
+sudo chmod +x /usr/local/bin/chromedriver
 
 # Setup the service
 python3 funpay_boost_ultimate.py --setup
@@ -97,6 +120,31 @@ python3 funpay_boost_ultimate.py --test
 
 # Run as daemon
 python3 funpay_boost_ultimate.py --daemon
+```
+
+### 🔧 Chrome Version Compatibility
+
+The project uses **Google Chrome** with **ChromeDriver** for automation. Make sure you have compatible versions:
+
+| Chrome Version | ChromeDriver Version | Download Link |
+|----------------|---------------------|---------------|
+| 138.x | 138.0.7204.92 | [Download](https://storage.googleapis.com/chrome-for-testing-public/138.0.7204.92/linux64/chromedriver-linux64.zip) |
+| 137.x | 137.0.6864.93 | [Download](https://storage.googleapis.com/chrome-for-testing-public/137.0.6864.93/linux64/chromedriver-linux64.zip) |
+| 136.x | 136.0.6909.71 | [Download](https://storage.googleapis.com/chrome-for-testing-public/136.0.6909.71/linux64/chromedriver-linux64.zip) |
+
+```bash
+# Check your Chrome version
+google-chrome --version
+
+# Check your ChromeDriver version
+chromedriver --version
+
+# If versions don't match, download the correct ChromeDriver
+sudo rm -f /usr/local/bin/chromedriver
+sudo wget -O /tmp/chromedriver.zip "DOWNLOAD_LINK_FROM_TABLE"
+sudo unzip /tmp/chromedriver.zip -d /tmp/
+sudo mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/
+sudo chmod +x /usr/local/bin/chromedriver
 ```
 
 ## 📊 Enhanced Features
@@ -190,13 +238,13 @@ sudo rm -rf /opt/funpay-boost /etc/funpay /var/log/funpay
 sudo userdel funpay
 
 # Kill processes
-sudo pkill -f "funpay\|firefox\|geckodriver\|Xvfb"
+sudo pkill -f "funpay\|chrome\|chromedriver\|Xvfb"
 ```
 
 #### One-Line Cleanup
 ```bash
 # Complete removal in one command
-sudo systemctl stop funpay-boost && sudo systemctl disable funpay-boost && sudo rm -f /etc/systemd/system/funpay-boost.service && sudo rm -rf /opt/funpay-boost /etc/funpay /var/log/funpay /home/funpay && sudo userdel funpay 2>/dev/null && sudo pkill -9 -f "funpay\|firefox\|geckodriver\|Xvfb" && echo "✅ FunPay Auto Boost completely removed!"
+sudo systemctl stop funpay-boost && sudo systemctl disable funpay-boost && sudo rm -f /etc/systemd/system/funpay-boost.service && sudo rm -rf /opt/funpay-boost /etc/funpay /var/log/funpay /home/funpay && sudo userdel funpay 2>/dev/null && sudo pkill -9 -f "funpay\|chrome\|chromedriver\|Xvfb" && echo "✅ FunPay Auto Boost completely removed!"
 ```
 
 ### 📊 Monitoring and Management
@@ -242,8 +290,8 @@ netstat -tulpn | grep python
 
 ### Software Dependencies
 - **Python**: 3.8 or higher
-- **Firefox**: Latest stable version
-- **Geckodriver**: Compatible with Firefox version
+- **Google Chrome**: Latest stable version
+- **ChromeDriver**: Compatible with Chrome version
 - **Xvfb**: For headless operation
 
 ### Python Packages
@@ -265,21 +313,25 @@ sudo bash quick_fix.sh
 sudo python3 -m pip install selenium requests beautifulsoup4 lxml
 ```
 
-#### 2. **GeckoDriver not found**
+#### 2. **ChromeDriver not found**
 ```bash
-# Install GeckoDriver
-sudo wget -O /tmp/geckodriver.tar.gz "https://github.com/mozilla/geckodriver/releases/download/v0.34.0/geckodriver-v0.34.0-linux64.tar.gz"
-sudo tar -xzf /tmp/geckodriver.tar.gz -C /usr/local/bin/
-sudo chmod +x /usr/local/bin/geckodriver
+# Install ChromeDriver
+sudo wget -O /tmp/chromedriver.zip "https://storage.googleapis.com/chrome-for-testing-public/138.0.7204.92/linux64/chromedriver-linux64.zip"
+sudo unzip /tmp/chromedriver.zip -d /tmp/
+sudo mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/
+sudo chmod +x /usr/local/bin/chromedriver
 ```
 
-#### 3. **Firefox not starting**
+#### 3. **Chrome not starting**
 ```bash
-# Install Firefox dependencies
-sudo apt install -y firefox xvfb libgtk-3-0 libdbus-glib-1-2
+# Install Chrome
+wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+sudo apt update
+sudo apt install -y google-chrome-stable
 
-# Test Firefox
-xvfb-run firefox --version
+# Test Chrome
+google-chrome --version
 ```
 
 #### 4. **Permission denied errors**
@@ -332,11 +384,11 @@ python3 funpay_boost_ultimate.py --daemon --debug
 # Test Selenium
 python3 -c "from selenium import webdriver; print('Selenium OK')"
 
-# Test Firefox
-firefox --version
+# Test Chrome
+google-chrome --version
 
-# Test GeckoDriver
-geckodriver --version
+# Test ChromeDriver
+chromedriver --version
 
 # Test Xvfb
 xvfb-run --help
@@ -364,6 +416,14 @@ sudo bash install_dependencies.sh
 - [Installation Troubleshooting](#-troubleshooting) - Common issues and solutions
 
 ## 🔄 Version History
+
+### v2.1.0 - Chrome Integration Version
+- ✅ **Migrated from Firefox to Google Chrome** for better stability
+- ✅ **ChromeDriver compatibility** with automatic version detection
+- ✅ **Simplified browser setup** with reduced timeout issues
+- ✅ **Enhanced error handling** for Chrome-specific issues
+- ✅ **Updated installation scripts** for Chrome dependencies
+- ✅ **Improved performance** and reliability
 
 ### v2.0.0 - Enhanced Ultimate Version
 - ✅ Advanced Rate Limiting with adaptive delays
@@ -415,7 +475,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🙏 Acknowledgments
 
 - **Selenium WebDriver team** - For the excellent automation framework
-- **Firefox and GeckoDriver developers** - For reliable browser automation
+- **Google Chrome and ChromeDriver developers** - For reliable browser automation
 - **Python community** - For amazing libraries and tools
 - **Contributors and testers** - For feedback and improvements
 - **Open source community** - For inspiration and best practices
@@ -431,7 +491,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ### 📈 Project Stats
 - **Language**: Python 3.8+
 - **Platform**: Linux (Ubuntu/Debian)
-- **Dependencies**: Selenium, Firefox, GeckoDriver
+- **Dependencies**: Selenium, Chrome, ChromeDriver
 - **License**: MIT
 - **Status**: Active Development
 

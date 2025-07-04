@@ -300,6 +300,7 @@ class FunPayBooster:
         self.display_num = 111
         self.consecutive_errors = 0
         self.max_errors = 3
+        self.pid_file = '/tmp/funpay_boost.pid'
         
         # Rate Limiting & Error Recovery
         self.rate_limiter = RateLimiter()
@@ -1072,6 +1073,171 @@ class FunPayBooster:
         
         print("")
     
+    def start_background(self):
+        """Start daemon in background"""
+        try:
+            # Check if already running
+            if self.is_running():
+                print("❌ FunPay Auto Boost is already running in background!")
+                print(f"PID: {self.get_running_pid()}")
+                return False
+            
+            print("🚀 Starting FunPay Auto Boost in background...")
+            
+            # Fork process to background
+            pid = os.fork()
+            
+            if pid > 0:
+                # Parent process
+                print(f"✅ FunPay Auto Boost started in background with PID: {pid}")
+                print("📋 Use --stop to stop the background process")
+                print("📋 Use --status to check status")
+                return True
+            
+            # Child process - run in background
+            os.setsid()  # Create new session
+            
+            # Redirect stdout/stderr to log file
+            log_file = '/var/log/funpay/background.log'
+            os.makedirs(os.path.dirname(log_file), exist_ok=True)
+            
+            with open(log_file, 'a') as f:
+                os.dup2(f.fileno(), sys.stdout.fileno())
+                os.dup2(f.fileno(), sys.stderr.fileno())
+            
+            # Save PID
+            with open(self.pid_file, 'w') as f:
+                f.write(str(os.getpid()))
+            
+            # Run daemon
+            self.run_daemon()
+            
+        except OSError as e:
+            print(f"❌ Failed to start background process: {e}")
+            return False
+        except Exception as e:
+            print(f"❌ Error starting background: {e}")
+            return False
+    
+    def stop_background(self):
+        """Stop background daemon"""
+        try:
+            if not self.is_running():
+                print("ℹ️ FunPay Auto Boost is not running in background")
+                return True
+            
+            pid = self.get_running_pid()
+            print(f"🛑 Stopping FunPay Auto Boost (PID: {pid})...")
+            
+            # Send SIGTERM first
+            os.kill(pid, signal.SIGTERM)
+            time.sleep(2)
+            
+            # Check if still running
+            if self.is_running():
+                print("⚠️ Process didn't stop gracefully, forcing...")
+                os.kill(pid, signal.SIGKILL)
+                time.sleep(1)
+            
+            # Remove PID file
+            if os.path.exists(self.pid_file):
+                os.remove(self.pid_file)
+            
+            print("✅ FunPay Auto Boost stopped successfully")
+            return True
+            
+        except ProcessLookupError:
+            print("ℹ️ Process was already stopped")
+            if os.path.exists(self.pid_file):
+                os.remove(self.pid_file)
+            return True
+        except PermissionError:
+            print("❌ Permission denied. Try running with sudo")
+            return False
+        except Exception as e:
+            print(f"❌ Error stopping background process: {e}")
+            return False
+    
+    def is_running(self):
+        """Check if daemon is running in background"""
+        try:
+            if not os.path.exists(self.pid_file):
+                return False
+            
+            with open(self.pid_file, 'r') as f:
+                pid = int(f.read().strip())
+            
+            # Check if process exists
+            os.kill(pid, 0)  # Signal 0 just checks if process exists
+            return True
+            
+        except (FileNotFoundError, ValueError, ProcessLookupError):
+            # Clean up stale PID file
+            if os.path.exists(self.pid_file):
+                os.remove(self.pid_file)
+            return False
+        except Exception:
+            return False
+    
+    def get_running_pid(self):
+        """Get PID of running background process"""
+        try:
+            if os.path.exists(self.pid_file):
+                with open(self.pid_file, 'r') as f:
+                    return int(f.read().strip())
+        except:
+            pass
+        return None
+    
+    def get_background_status(self):
+        """Get detailed background status"""
+        print("╔══════════════════════════════════════════════════════════════╗")
+        print("║              FunPay Auto Boost - Background Status          ║")
+        print("╚══════════════════════════════════════════════════════════════╝")
+        print("")
+        
+        if self.is_running():
+            pid = self.get_running_pid()
+            print(f"🟢 Status: Running in background")
+            print(f"🆔 PID: {pid}")
+            
+            # Get process info
+            try:
+                result = subprocess.run(['ps', '-p', str(pid), '-o', 'pid,ppid,etime,cmd'], 
+                                      capture_output=True, text=True)
+                if result.returncode == 0:
+                    lines = result.stdout.strip().split('\n')
+                    if len(lines) > 1:
+                        print(f"📊 Process Info:")
+                        print(f"   {lines[0]}")  # Header
+                        print(f"   {lines[1]}")  # Process info
+            except:
+                pass
+            
+            # Show log file location
+            print(f"📄 Log File: /var/log/funpay/background.log")
+            print(f"📄 Boost Log: /var/log/funpay/boost.log")
+            
+            # Show recent activity
+            try:
+                result = subprocess.run(['tail', '-3', '/var/log/funpay/boost.log'], 
+                                      capture_output=True, text=True)
+                if result.returncode == 0 and result.stdout.strip():
+                    print(f"📋 Recent Activity:")
+                    for line in result.stdout.strip().split('\n'):
+                        print(f"   {line}")
+            except:
+                pass
+                
+        else:
+            print(f"🔴 Status: Not running")
+            print(f"💡 Use --start to start in background")
+        
+        print("")
+        
+        # Show configuration status
+        self.get_status()
+    
     def cleanup(self):
         """Clean up resources"""
         try:
@@ -1100,6 +1266,16 @@ class FunPayBooster:
             self.kill_processes('chromedriver')
             self.kill_processes('Xvfb')
             
+            # Remove PID file if we're the background process
+            if os.path.exists(self.pid_file):
+                try:
+                    with open(self.pid_file, 'r') as f:
+                        pid = int(f.read().strip())
+                    if pid == os.getpid():
+                        os.remove(self.pid_file)
+                except:
+                    pass
+            
             self.logger.info("Cleanup completed")
             
         except Exception as e:
@@ -1109,9 +1285,12 @@ def main():
     """Main function"""
     import argparse
     
-    parser = argparse.ArgumentParser(description='FunPay Auto Boost Ultimate')
-    parser.add_argument('--daemon', action='store_true', help='Run as daemon')
-    parser.add_argument('--status', action='store_true', help='Show status')
+    parser = argparse.ArgumentParser(description='FunPay Auto Boost Ultimate - Background Management')
+    parser.add_argument('--daemon', action='store_true', help='Run as daemon (foreground)')
+    parser.add_argument('--start', action='store_true', help='Start daemon in background')
+    parser.add_argument('--stop', action='store_true', help='Stop background daemon')
+    parser.add_argument('--restart', action='store_true', help='Restart background daemon')
+    parser.add_argument('--status', action='store_true', help='Show status (including background)')
     parser.add_argument('--setup', action='store_true', help='Run initial setup')
     parser.add_argument('--test', action='store_true', help='Test boost once')
     args = parser.parse_args()
@@ -1119,24 +1298,90 @@ def main():
     booster = FunPayBooster()
     
     try:
-        if args.status:
-            booster.get_status()
+        if args.start:
+            # Ask user if they want to run in background
+            if not booster.is_running():
+                print("🚀 FunPay Auto Boost - Background Mode")
+                print("="*50)
+                choice = input("Do you want to start in background? (Y/n): ").strip().lower()
+                if choice in ['', 'y', 'yes']:
+                    booster.start_background()
+                else:
+                    print("Starting in foreground mode...")
+                    booster.run_daemon()
+            else:
+                print("❌ Already running in background!")
+                
+        elif args.stop:
+            booster.stop_background()
+            
+        elif args.restart:
+            print("🔄 Restarting FunPay Auto Boost...")
+            booster.stop_background()
+            time.sleep(2)
+            booster.start_background()
+            
+        elif args.status:
+            booster.get_background_status()
+            
         elif args.setup:
             booster.get_user_credentials()
+            
         elif args.test:
             if booster.setup_chrome():
                 if booster.setup_authentication():
                     result = booster.check_boost_status()
                     print(f"Test result: {result}")
                 booster.cleanup()
-        else:
+                
+        elif args.daemon:
+            # Traditional daemon mode (foreground)
+            print("⚠️ Running in foreground mode. Use --start for background mode.")
             booster.run_daemon()
+            
+        else:
+            # Default behavior - ask user what they want
+            print("╔══════════════════════════════════════════════════════════════╗")
+            print("║                 FunPay Auto Boost Ultimate                  ║")
+            print("╚══════════════════════════════════════════════════════════════╝")
+            print("")
+            print("Choose an option:")
+            print("1. 🚀 Start in background (recommended)")
+            print("2. 🖥️  Start in foreground")
+            print("3. 📊 Show status")
+            print("4. 🛑 Stop background process")
+            print("5. ⚙️  Setup configuration")
+            print("6. 🧪 Test boost")
+            print("")
+            
+            choice = input("Enter your choice (1-6): ").strip()
+            
+            if choice == '1':
+                booster.start_background()
+            elif choice == '2':
+                booster.run_daemon()
+            elif choice == '3':
+                booster.get_background_status()
+            elif choice == '4':
+                booster.stop_background()
+            elif choice == '5':
+                booster.get_user_credentials()
+            elif choice == '6':
+                if booster.setup_chrome():
+                    if booster.setup_authentication():
+                        result = booster.check_boost_status()
+                        print(f"Test result: {result}")
+                    booster.cleanup()
+            else:
+                print("❌ Invalid choice")
+                
     except KeyboardInterrupt:
         print("\n🛑 Stopped by user")
     except Exception as e:
         print(f"❌ Fatal error: {e}")
     finally:
-        booster.cleanup()
+        if not args.start:  # Don't cleanup if we're starting background
+            booster.cleanup()
 
 if __name__ == "__main__":
     main()

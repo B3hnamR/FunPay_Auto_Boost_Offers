@@ -122,18 +122,9 @@ class BrowserStealth:
         chrome_options.add_argument(f"--window-size={width},{height}")
         chrome_options.add_argument(f"--lang={language.split(',')[0]}")
         
-        # Advanced anti-detection
-        chrome_options.add_argument("--no-sandbox")
-        chrome_options.add_argument("--disable-dev-shm-usage")
-        chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+        # Simple anti-detection
         chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
         chrome_options.add_experimental_option('useAutomationExtension', False)
-        
-        # Performance and fingerprinting protection
-        chrome_options.add_argument("--disable-extensions")
-        chrome_options.add_argument("--disable-plugins")
-        chrome_options.add_argument("--disable-images")
-        chrome_options.add_argument("--disable-gpu")
         
         return chrome_options
     
@@ -493,17 +484,11 @@ class FunPayBooster:
             # Apply stealth settings first
             chrome_options = self.browser_stealth.apply_stealth_settings(chrome_options)
             
-            # Enhanced headless options for Selenium 4.x
+            # Simple headless options
             chrome_options.add_argument("--headless")
             chrome_options.add_argument("--no-sandbox")
             chrome_options.add_argument("--disable-dev-shm-usage")
             chrome_options.add_argument("--disable-gpu")
-            chrome_options.add_argument("--disable-software-rasterizer")
-            chrome_options.add_argument("--disable-background-timer-throttling")
-            chrome_options.add_argument("--disable-backgrounding-occluded-windows")
-            chrome_options.add_argument("--disable-renderer-backgrounding")
-            chrome_options.add_argument("--disable-features=TranslateUI")
-            chrome_options.add_argument("--disable-ipc-flooding-protection")
             
             # Enhanced service configuration for ChromeDriver
             service_args = [

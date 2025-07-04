@@ -1,10 +1,7 @@
 #!/bin/bash
 
-# FunPay Auto Boost - Complete Interactive Installation
-# Enhanced with interactive menu and all fixes
-
-# Removed set -e to prevent script termination on errors
-# We'll handle errors manually for better control
+# FunPay Auto Boost - Fixed Installation Script
+# This version has improved error handling and won't terminate unexpectedly
 
 # Colors
 RED='\033[0;31m'
@@ -23,7 +20,7 @@ LOG_DIR="/var/log/funpay"
 CONFIG_DIR="/etc/funpay"
 SCRIPT_DIR="$(pwd)"
 
-# Debug mode - set to 1 to enable verbose output
+# Debug mode
 DEBUG_MODE=0
 if [[ "$1" == "--debug" ]]; then
     DEBUG_MODE=1
@@ -35,6 +32,24 @@ debug_log() {
     if [[ $DEBUG_MODE -eq 1 ]]; then
         echo -e "${CYAN}[DEBUG]${NC} $1"
     fi
+}
+
+# Error handling function
+handle_error() {
+    local exit_code=$1
+    local command="$2"
+    local step="$3"
+    
+    if [[ $exit_code -ne 0 ]]; then
+        echo ""
+        echo -e "${YELLOW}⚠️ Warning: $step failed (exit code: $exit_code)${NC}"
+        if [[ $DEBUG_MODE -eq 1 ]]; then
+            echo -e "${CYAN}[DEBUG] Failed command: $command${NC}"
+        fi
+        echo -e "${YELLOW}Continuing with installation...${NC}"
+        return 1
+    fi
+    return 0
 }
 
 # Function to display header
@@ -212,6 +227,39 @@ show_progress() {
     fi
 }
 
+# Safe command execution
+safe_execute() {
+    local command="$1"
+    local description="$2"
+    local critical="$3"  # "true" if this step is critical
+    
+    debug_log "Executing: $command"
+    
+    if [[ $DEBUG_MODE -eq 1 ]]; then
+        echo -e "${CYAN}[DEBUG] Running: $command${NC}"
+        eval "$command"
+        local exit_code=$?
+    else
+        eval "$command" >/dev/null 2>&1
+        local exit_code=$?
+    fi
+    
+    if [[ $exit_code -ne 0 ]]; then
+        if [[ "$critical" == "true" ]]; then
+            echo ""
+            echo -e "${RED}❌ Critical error in: $description${NC}"
+            echo -e "${RED}Command failed: $command${NC}"
+            echo -e "${RED}Installation cannot continue.${NC}"
+            exit 1
+        else
+            handle_error $exit_code "$command" "$description"
+            return 1
+        fi
+    fi
+    
+    return 0
+}
+
 # Main installation function
 main_installation() {
     show_header
@@ -227,7 +275,6 @@ main_installation() {
     ((current_step++))
     show_progress $current_step $total_steps "Checking system requirements"
     debug_log "Performing system checks"
-    sleep 1
     
     # Check if running as root
     if [[ $EUID -ne 0 ]]; then
@@ -241,6 +288,7 @@ main_installation() {
         . /etc/os-release
         OS=$NAME
         VER=$VERSION_ID
+        debug_log "Detected OS: $OS $VER"
     else
         echo ""
         echo -e "${RED}❌ Cannot detect OS version${NC}"
@@ -250,127 +298,106 @@ main_installation() {
     # Step 2: Update system
     ((current_step++))
     show_progress $current_step $total_steps "Updating system packages"
-    if ! apt update >/dev/null 2>&1; then
-        echo ""
-        echo -e "${YELLOW}⚠️ Warning: Failed to update package list, continuing...${NC}"
-    fi
-    if ! apt upgrade -y >/dev/null 2>&1; then
-        echo ""
-        echo -e "${YELLOW}⚠️ Warning: Failed to upgrade packages, continuing...${NC}"
-    fi
+    debug_log "Updating package list"
+    
+    safe_execute "apt update" "Package list update" "false"
+    safe_execute "apt upgrade -y" "Package upgrade" "false"
     
     # Step 3: Install dependencies
     ((current_step++))
     show_progress $current_step $total_steps "Installing system dependencies"
-    if ! apt install -y \
-        python3 \
-        python3-pip \
-        python3-venv \
-        firefox \
-        xvfb \
-        wget \
-        curl \
-        unzip \
-        git \
-        supervisor \
-        ufw \
-        htop \
-        screen \
-        tmux \
-        jq \
-        software-properties-common \
-        procps \
-        psmisc >/dev/null 2>&1; then
+    debug_log "Installing essential packages"
+    
+    # Try to install all packages at once
+    if ! safe_execute "apt install -y python3 python3-pip python3-venv firefox xvfb wget curl unzip git supervisor ufw htop screen tmux jq software-properties-common procps psmisc" "System dependencies installation" "false"; then
         echo ""
-        echo -e "${RED}❌ Failed to install system dependencies${NC}"
-        echo -e "${YELLOW}Trying to install essential packages only...${NC}"
+        echo -e "${YELLOW}Trying to install essential packages individually...${NC}"
         
-        # Try installing essential packages one by one
+        # Essential packages that we absolutely need
         essential_packages=("python3" "python3-pip" "python3-venv" "firefox" "xvfb" "wget" "curl")
         for package in "${essential_packages[@]}"; do
-            if ! apt install -y "$package" >/dev/null 2>&1; then
-                echo -e "${RED}❌ Failed to install $package${NC}"
-            fi
+            echo -e "${CYAN}Installing $package...${NC}"
+            safe_execute "apt install -y $package" "$package installation" "false"
+        done
+        
+        # Optional packages
+        optional_packages=("git" "supervisor" "ufw" "htop" "screen" "tmux" "jq" "software-properties-common" "procps" "psmisc")
+        for package in "${optional_packages[@]}"; do
+            safe_execute "apt install -y $package" "$package installation" "false"
         done
     fi
     
     # Step 4: Create user
     ((current_step++))
     show_progress $current_step $total_steps "Setting up service user"
+    debug_log "Creating service user"
+    
     if ! id "$SERVICE_USER" &>/dev/null; then
-        useradd -r -s /bin/false -d "$INSTALL_DIR" "$SERVICE_USER"
+        safe_execute "useradd -r -s /bin/false -d '$INSTALL_DIR' '$SERVICE_USER'" "Service user creation" "true"
+    else
+        debug_log "Service user already exists"
     fi
     
     # Step 5: Create directories
     ((current_step++))
     show_progress $current_step $total_steps "Creating directories"
-    mkdir -p "$INSTALL_DIR"
-    mkdir -p "$LOG_DIR"
-    mkdir -p "$CONFIG_DIR"
-    mkdir -p "/home/$SERVICE_USER/.mozilla"
+    debug_log "Creating required directories"
+    
+    safe_execute "mkdir -p '$INSTALL_DIR'" "Install directory creation" "true"
+    safe_execute "mkdir -p '$LOG_DIR'" "Log directory creation" "true"
+    safe_execute "mkdir -p '$CONFIG_DIR'" "Config directory creation" "true"
+    safe_execute "mkdir -p '/home/$SERVICE_USER/.mozilla'" "Mozilla directory creation" "false"
     
     # Step 6: Setup Python environment
     ((current_step++))
     show_progress $current_step $total_steps "Setting up Python environment"
-    cd "$INSTALL_DIR"
-    if ! python3 -m venv venv >/dev/null 2>&1; then
-        echo ""
-        echo -e "${RED}❌ Failed to create Python virtual environment${NC}"
-        exit 1
-    fi
+    debug_log "Setting up Python virtual environment"
     
-    if ! source venv/bin/activate; then
-        echo ""
-        echo -e "${RED}❌ Failed to activate Python virtual environment${NC}"
-        exit 1
-    fi
+    cd "$INSTALL_DIR" || exit 1
+    safe_execute "python3 -m venv venv" "Python virtual environment creation" "true"
+    safe_execute "source venv/bin/activate" "Virtual environment activation" "true"
+    safe_execute "pip install --upgrade pip" "Pip upgrade" "false"
     
-    if ! pip install --upgrade pip >/dev/null 2>&1; then
+    # Install Python packages
+    if ! safe_execute "pip install selenium schedule requests beautifulsoup4 lxml" "Python packages installation" "false"; then
         echo ""
-        echo -e "${YELLOW}⚠️ Warning: Failed to upgrade pip, continuing...${NC}"
-    fi
-    
-    if ! pip install selenium schedule requests beautifulsoup4 lxml >/dev/null 2>&1; then
-        echo ""
-        echo -e "${RED}❌ Failed to install Python packages${NC}"
-        echo -e "${YELLOW}Trying to install packages individually...${NC}"
+        echo -e "${YELLOW}Installing Python packages individually...${NC}"
         
         packages=("selenium" "schedule" "requests" "beautifulsoup4" "lxml")
         for package in "${packages[@]}"; do
-            if ! pip install "$package" >/dev/null 2>&1; then
-                echo -e "${YELLOW}⚠️ Warning: Failed to install $package${NC}"
-            fi
+            echo -e "${CYAN}Installing $package...${NC}"
+            safe_execute "pip install $package" "$package installation" "false"
         done
     fi
     
     # Step 7: Install GeckoDriver
     ((current_step++))
     show_progress $current_step $total_steps "Installing GeckoDriver"
+    debug_log "Installing GeckoDriver"
+    
     GECKODRIVER_VERSION="v0.33.0"
     GECKODRIVER_URL="https://github.com/mozilla/geckodriver/releases/download/${GECKODRIVER_VERSION}/geckodriver-${GECKODRIVER_VERSION}-linux64.tar.gz"
     
-    if ! wget -q -O /tmp/geckodriver.tar.gz "$GECKODRIVER_URL"; then
-        echo ""
-        echo -e "${YELLOW}⚠️ Warning: Failed to download GeckoDriver, trying alternative method...${NC}"
-        if ! curl -L -o /tmp/geckodriver.tar.gz "$GECKODRIVER_URL"; then
-            echo -e "${RED}❌ Failed to download GeckoDriver${NC}"
-        fi
+    if ! safe_execute "wget -q -O /tmp/geckodriver.tar.gz '$GECKODRIVER_URL'" "GeckoDriver download" "false"; then
+        safe_execute "curl -L -o /tmp/geckodriver.tar.gz '$GECKODRIVER_URL'" "GeckoDriver download (curl)" "false"
     fi
     
     if [[ -f /tmp/geckodriver.tar.gz ]]; then
-        if ! tar -xzf /tmp/geckodriver.tar.gz -C /usr/local/bin/ 2>/dev/null; then
-            echo ""
-            echo -e "${YELLOW}⚠️ Warning: Failed to extract GeckoDriver to /usr/local/bin, trying /usr/bin...${NC}"
-            tar -xzf /tmp/geckodriver.tar.gz -C /usr/bin/ 2>/dev/null || echo -e "${RED}❌ Failed to extract GeckoDriver${NC}"
+        if ! safe_execute "tar -xzf /tmp/geckodriver.tar.gz -C /usr/local/bin/" "GeckoDriver extraction" "false"; then
+            safe_execute "tar -xzf /tmp/geckodriver.tar.gz -C /usr/bin/" "GeckoDriver extraction (alternative)" "false"
         fi
-        chmod +x /usr/local/bin/geckodriver 2>/dev/null || chmod +x /usr/bin/geckodriver 2>/dev/null
-        rm -f /tmp/geckodriver.tar.gz
+        safe_execute "chmod +x /usr/local/bin/geckodriver" "GeckoDriver permissions" "false"
+        safe_execute "chmod +x /usr/bin/geckodriver" "GeckoDriver permissions (alternative)" "false"
+        safe_execute "rm -f /tmp/geckodriver.tar.gz" "Cleanup GeckoDriver archive" "false"
     fi
     
     # Step 8: Create configuration
     ((current_step++))
     show_progress $current_step $total_steps "Creating configuration file"
-    mkdir -p "$CONFIG_DIR"
+    debug_log "Creating configuration file"
+    
+    safe_execute "mkdir -p '$CONFIG_DIR'" "Config directory creation" "true"
+    
     cat > "$CONFIG_DIR/config.json" << EOF
 {
   "username": "$FUNPAY_USERNAME",
@@ -385,49 +412,53 @@ main_installation() {
 }
 EOF
     
+    if [[ ! -f "$CONFIG_DIR/config.json" ]]; then
+        echo ""
+        echo -e "${RED}❌ Failed to create configuration file${NC}"
+        exit 1
+    fi
+    
     # Step 9: Create application
     ((current_step++))
     show_progress $current_step $total_steps "Creating application file"
+    debug_log "Creating application file"
+    
     create_application_file
     
     # Step 10: Set permissions
     ((current_step++))
     show_progress $current_step $total_steps "Setting permissions"
-    chown -R "$SERVICE_USER:$SERVICE_USER" "$INSTALL_DIR"
-    chown -R "$SERVICE_USER:$SERVICE_USER" "$LOG_DIR"
-    chown -R "$SERVICE_USER:$SERVICE_USER" "$CONFIG_DIR"
-    chmod 755 "$INSTALL_DIR"
-    chmod 755 "$LOG_DIR"
-    chmod 750 "$CONFIG_DIR"
-    chmod 600 "$CONFIG_DIR/config.json"
-    chmod +x "$INSTALL_DIR/funpay_boost.py"
+    debug_log "Setting file permissions"
+    
+    safe_execute "chown -R '$SERVICE_USER:$SERVICE_USER' '$INSTALL_DIR'" "Install directory ownership" "true"
+    safe_execute "chown -R '$SERVICE_USER:$SERVICE_USER' '$LOG_DIR'" "Log directory ownership" "true"
+    safe_execute "chown -R '$SERVICE_USER:$SERVICE_USER' '$CONFIG_DIR'" "Config directory ownership" "true"
+    safe_execute "chmod 755 '$INSTALL_DIR'" "Install directory permissions" "false"
+    safe_execute "chmod 755 '$LOG_DIR'" "Log directory permissions" "false"
+    safe_execute "chmod 750 '$CONFIG_DIR'" "Config directory permissions" "false"
+    safe_execute "chmod 600 '$CONFIG_DIR/config.json'" "Config file permissions" "false"
+    safe_execute "chmod +x '$INSTALL_DIR/funpay_boost.py'" "Application file permissions" "false"
     
     # Step 11: Create service
     ((current_step++))
     show_progress $current_step $total_steps "Creating systemd service"
+    debug_log "Creating systemd service"
+    
     create_systemd_service
     create_management_script
     
     # Step 12: Start service
     ((current_step++))
     show_progress $current_step $total_steps "Starting service"
-    if ! systemctl daemon-reload; then
-        echo ""
-        echo -e "${YELLOW}⚠️ Warning: Failed to reload systemd daemon${NC}"
-    fi
+    debug_log "Starting systemd service"
     
-    if ! systemctl enable funpay-boost >/dev/null 2>&1; then
-        echo ""
-        echo -e "${YELLOW}⚠️ Warning: Failed to enable service${NC}"
-    fi
-    
-    if ! systemctl start funpay-boost; then
-        echo ""
-        echo -e "${YELLOW}⚠️ Warning: Failed to start service automatically${NC}"
-        echo -e "${YELLOW}You can start it manually later with: systemctl start funpay-boost${NC}"
-    fi
+    safe_execute "systemctl daemon-reload" "Systemd daemon reload" "false"
+    safe_execute "systemctl enable funpay-boost" "Service enable" "false"
+    safe_execute "systemctl start funpay-boost" "Service start" "false"
     
     echo ""
+    echo ""
+    echo -e "${GREEN}✅ Installation process completed!${NC}"
     echo ""
 }
 
@@ -947,9 +978,9 @@ class FunPayBooster:
             last_boost = self.config.get('last_boost')
             interval = self.config.get('boost_interval', 3)
             
-            print("╔══════════════════════════════════════════════════════════════╗")
+            print("╔═════════════════════════════════════════════════��════════════╗")
             print("║                    FunPay Auto Boost Status                 ║")
-            print("╚═════════════════════════════════════════════��════════════════╝")
+            print("╚═════════════════════════════════════════════════════════════╝")
             print("")
             print(f"🎯 Target URL: {self.config.get('target_url')}")
             print(f"👤 Username: {self.config.get('username')}")
@@ -1245,9 +1276,9 @@ show_results() {
     show_header
     
     sleep 3
-    SERVICE_STATUS=$(systemctl is-active funpay-boost)
+    SERVICE_STATUS=$(systemctl is-active funpay-boost 2>/dev/null || echo "inactive")
     
-    echo -e "${GREEN}🎉 Installation Completed Successfully!${NC}"
+    echo -e "${GREEN}🎉 Installation Completed!${NC}"
     echo ""
     
     if [[ "$SERVICE_STATUS" == "active" ]]; then
@@ -1279,7 +1310,8 @@ show_results() {
     echo ""
     
     if [[ "$SERVICE_STATUS" != "active" ]]; then
-        echo -e "${YELLOW}💡 Tip: Check logs if service is not running: funpay-boost logs${NC}"
+        echo -e "${YELLOW}💡 To start the service manually: funpay-boost start${NC}"
+        echo -e "${YELLOW}💡 To check logs: funpay-boost logs${NC}"
     fi
     
     echo -e "${BLUE}📖 For help and troubleshooting, run: funpay-boost menu${NC}"
@@ -1297,11 +1329,11 @@ main() {
         # Show current config
         echo -e "${CYAN}Current Configuration:${NC}"
         if command -v jq >/dev/null 2>&1; then
-            jq -r '"Username: " + .username, "URL: " + .target_url, "Interval: " + (.boost_interval|tostring) + " hours"' /etc/funpay/config.json
+            jq -r '"Username: " + .username, "URL: " + .target_url, "Interval: " + (.boost_interval|tostring) + " hours"' /etc/funpay/config.json 2>/dev/null || echo "Error reading config"
         else
-            echo "   Username: $(grep -o '"username":"[^"]*"' /etc/funpay/config.json | cut -d'"' -f4)"
-            echo "   URL: $(grep -o '"target_url":"[^"]*"' /etc/funpay/config.json | cut -d'"' -f4)"
-            echo "   Interval: $(grep -o '"boost_interval":[0-9]*' /etc/funpay/config.json | cut -d':' -f2) hours"
+            echo "   Username: $(grep -o '"username":"[^"]*"' /etc/funpay/config.json 2>/dev/null | cut -d'"' -f4 || echo "Unknown")"
+            echo "   URL: $(grep -o '"target_url":"[^"]*"' /etc/funpay/config.json 2>/dev/null | cut -d'"' -f4 || echo "Unknown")"
+            echo "   Interval: $(grep -o '"boost_interval":[0-9]*' /etc/funpay/config.json 2>/dev/null | cut -d':' -f2 || echo "Unknown") hours"
         fi
         echo ""
         

@@ -117,11 +117,10 @@ class BrowserStealth:
         user_agent = self.get_random_user_agent()
         language = self.get_random_language()
         
-        # Basic stealth
+        # Basic stealth (marionette must be enabled for Selenium 4.x)
         firefox_options.set_preference("general.useragent.override", user_agent)
         firefox_options.set_preference("dom.webdriver.enabled", False)
         firefox_options.set_preference("useAutomationExtension", False)
-        firefox_options.set_preference("marionette.enabled", False)
         
         # Language and locale
         firefox_options.set_preference("intl.accept_languages", language)
@@ -498,75 +497,159 @@ class FunPayBooster:
             return False
     
     def setup_firefox(self):
-        """Setup Firefox with enhanced stealth and anti-detection"""
+        """Setup Firefox with enhanced Selenium 4.x and Firefox 140.x compatibility"""
         try:
             if not self.setup_display():
                 return False
             
-            # Firefox options with stealth enhancements
+            # Firefox options with enhanced compatibility
             firefox_options = Options()
             
-            # Apply stealth settings
+            # Apply stealth settings first
             firefox_options = self.browser_stealth.apply_stealth_settings(firefox_options)
             
-            # Basic headless options
+            # Enhanced headless options for Selenium 4.x
             firefox_options.add_argument("--headless")
             firefox_options.add_argument("--no-sandbox")
             firefox_options.add_argument("--disable-dev-shm-usage")
             firefox_options.add_argument("--disable-gpu")
-            firefox_options.add_argument("--single-process")
-            firefox_options.add_argument("--disable-extensions")
-            firefox_options.add_argument("--disable-plugins")
+            firefox_options.add_argument("--disable-software-rasterizer")
+            firefox_options.add_argument("--disable-background-timer-throttling")
+            firefox_options.add_argument("--disable-backgrounding-occluded-windows")
+            firefox_options.add_argument("--disable-renderer-backgrounding")
+            firefox_options.add_argument("--disable-features=TranslateUI")
+            firefox_options.add_argument("--disable-ipc-flooding-protection")
             
-            # Performance optimizations
+            # Selenium 4.x and Firefox 140.x specific settings
+            firefox_options.set_preference("marionette.enabled", True)
+            firefox_options.set_preference("marionette.port", 0)  # Auto-assign port
+            firefox_options.set_preference("remote.enabled", True)
+            firefox_options.set_preference("remote.force-local", True)
+            firefox_options.set_preference("fission.autostart", False)  # Disable site isolation
+            
+            # Enhanced performance optimizations
             firefox_options.set_preference("dom.ipc.processCount", 1)
             firefox_options.set_preference("security.sandbox.content.level", 0)
             firefox_options.set_preference("browser.cache.disk.enable", False)
             firefox_options.set_preference("browser.cache.memory.enable", False)
-            firefox_options.set_preference("permissions.default.image", 2)
+            firefox_options.set_preference("browser.cache.offline.enable", False)
+            firefox_options.set_preference("network.http.use-cache", False)
+            firefox_options.set_preference("permissions.default.image", 2)  # Block images
             firefox_options.set_preference("javascript.enabled", True)
             
-            # Enhanced timeout settings with randomization
-            base_timeout = random.randint(15, 25)
+            # Memory and resource management
+            firefox_options.set_preference("browser.sessionhistory.max_total_viewers", 0)
+            firefox_options.set_preference("browser.sessionstore.max_tabs_undo", 0)
+            firefox_options.set_preference("browser.sessionstore.max_windows_undo", 0)
+            firefox_options.set_preference("media.volume_scale", "0.0")
+            firefox_options.set_preference("media.autoplay.enabled", False)
+            
+            # Enhanced timeout settings for stability
+            base_timeout = random.randint(45, 60)  # Increased for Firefox 140.x
             firefox_options.set_preference("dom.max_script_run_time", base_timeout)
             firefox_options.set_preference("network.http.connection-timeout", base_timeout)
             firefox_options.set_preference("network.http.response.timeout", base_timeout)
+            firefox_options.set_preference("network.http.request.timeout", base_timeout)
+            firefox_options.set_preference("network.websocket.timeout.ping.request", base_timeout)
             
-            # Disable unnecessary features
+            # Disable unnecessary features for better performance
             firefox_options.set_preference("browser.startup.homepage_override.mstone", "ignore")
             firefox_options.set_preference("datareporting.policy.dataSubmissionEnabled", False)
             firefox_options.set_preference("toolkit.telemetry.enabled", False)
             firefox_options.set_preference("browser.crashReports.unsubmittedCheck.enabled", False)
             firefox_options.set_preference("app.update.enabled", False)
+            firefox_options.set_preference("extensions.update.enabled", False)
+            firefox_options.set_preference("browser.newtabpage.enabled", False)
+            firefox_options.set_preference("browser.newtab.preload", False)
             
-            # Create service with random log level
-            log_levels = ['fatal', 'error', 'warn']
-            service = Service(
-                executable_path='/usr/local/bin/geckodriver',
-                service_args=['--log', random.choice(log_levels)]
-            )
+            # Enhanced service configuration for GeckoDriver 0.36.0
+            service_args = [
+                '--log', 'warn',  # Reduced logging
+                '--marionette-port', '0',  # Auto-assign port
+                '--websocket-port', '0',  # Auto-assign WebSocket port
+                '--allow-hosts', 'localhost',
+                '--allow-origins', 'http://localhost'
+            ]
             
-            # Start Firefox with error recovery
+            # Try multiple GeckoDriver paths
+            geckodriver_paths = [
+                '/usr/local/bin/geckodriver',
+                '/usr/bin/geckodriver',
+                'geckodriver'
+            ]
+            
+            service = None
+            for path in geckodriver_paths:
+                try:
+                    if os.path.exists(path) or path == 'geckodriver':
+                        service = Service(executable_path=path, service_args=service_args)
+                        self.logger.info(f"Using GeckoDriver at: {path}")
+                        break
+                except Exception as e:
+                    self.logger.debug(f"Failed to create service with {path}: {e}")
+                    continue
+            
+            if not service:
+                self.logger.error("GeckoDriver not found in any expected location")
+                return False
+            
+            # Enhanced Firefox startup with better error handling
             def _start_firefox():
-                driver = webdriver.Firefox(service=service, options=firefox_options)
-                driver.set_page_load_timeout(random.randint(20, 30))
-                driver.implicitly_wait(random.randint(5, 10))
-                return driver
+                try:
+                    self.logger.info("Starting Firefox with enhanced compatibility settings...")
+                    
+                    # Create driver with enhanced configuration
+                    driver = webdriver.Firefox(service=service, options=firefox_options)
+                    
+                    # Set enhanced timeouts for Selenium 4.x
+                    driver.set_page_load_timeout(90)  # Increased for stability
+                    driver.implicitly_wait(20)  # Increased implicit wait
+                    
+                    # Set window size for consistency
+                    width, height = self.browser_stealth.get_random_resolution()
+                    driver.set_window_size(width, height)
+                    
+                    self.logger.info("Firefox driver created successfully")
+                    return driver
+                    
+                except Exception as e:
+                    self.logger.error(f"Firefox startup failed: {e}")
+                    raise e
             
+            # Use error recovery with increased retries
             self.driver = self.error_recovery.execute_with_retry(
                 _start_firefox, "firefox_startup"
             )
             
             if not self.driver:
+                self.logger.error("Failed to start Firefox after all retries")
                 return False
             
-            # Apply stealth scripts
-            self.browser_stealth.add_stealth_scripts(self.driver)
+            # Apply stealth scripts after successful startup
+            try:
+                self.browser_stealth.add_stealth_scripts(self.driver)
+                self.logger.info("Stealth scripts applied successfully")
+            except Exception as e:
+                self.logger.warning(f"Failed to apply stealth scripts: {e}")
+            
+            # Verify Firefox is working with a simple test
+            try:
+                self.logger.info("Verifying Firefox functionality...")
+                test_html = "data:text/html,<html><body><h1>Firefox Compatibility Test</h1><p>Selenium 4.x + Firefox 140.x</p></body></html>"
+                self.driver.get(test_html)
+                
+                if "Firefox Compatibility Test" in self.driver.page_source:
+                    self.logger.info("✅ Firefox verification successful")
+                else:
+                    self.logger.warning("⚠️ Firefox verification unclear")
+                    
+            except Exception as e:
+                self.logger.warning(f"Firefox verification error: {e}")
             
             # Add human-like delay after startup
-            self.rate_limiter.add_human_delay(2.0, 5.0)
+            self.rate_limiter.add_human_delay(3.0, 6.0)
             
-            self.logger.info("Firefox driver initialized successfully with stealth features")
+            self.logger.info("✅ Firefox driver initialized successfully with enhanced compatibility")
             return True
             
         except Exception as e:

@@ -130,16 +130,10 @@ class BrowserStealth:
         chrome_options.add_experimental_option('useAutomationExtension', False)
         
         # Performance and fingerprinting protection
-        chrome_options.add_argument("--disable-web-security")
-        chrome_options.add_argument("--disable-features=VizDisplayCompositor")
         chrome_options.add_argument("--disable-extensions")
         chrome_options.add_argument("--disable-plugins")
         chrome_options.add_argument("--disable-images")
         chrome_options.add_argument("--disable-gpu")
-        
-        # Memory and resource management
-        chrome_options.add_argument("--memory-pressure-off")
-        chrome_options.add_argument("--max_old_space_size=4096")
         
         return chrome_options
     

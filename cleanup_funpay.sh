@@ -87,7 +87,9 @@ echo -e "${YELLOW}6. Killing any running FunPay processes...${NC}"
 pkill -f "funpay" 2>/dev/null || echo "   No FunPay processes found"
 pkill -f "firefox.*funpay" 2>/dev/null || echo "   No Firefox processes found"
 pkill -f "geckodriver" 2>/dev/null || echo "   No geckodriver processes found"
-pkill -f "Xvfb.*99" 2>/dev/null || echo "   No Xvfb processes found"
+pkill -f "Xvfb.*99" 2>/dev/null || echo "   No Xvfb :99 processes found"
+pkill -f "Xvfb.*111" 2>/dev/null || echo "   No Xvfb :111 processes found"
+pkill -f "funpay_boost_ultimate" 2>/dev/null || echo "   No ultimate script processes found"
 echo -e "${GREEN}   ✅ Processes terminated${NC}"
 
 # Step 7: Remove installation directory
@@ -137,8 +139,12 @@ fi
 echo -e "${YELLOW}11. Cleaning up temporary files...${NC}"
 rm -f /tmp/.X99-lock 2>/dev/null || true
 rm -f /tmp/.X111-lock 2>/dev/null || true
+rm -f /tmp/.X*-lock 2>/dev/null || true
 rm -f /tmp/geckodriver* 2>/dev/null || true
 rm -f /tmp/funpay* 2>/dev/null || true
+rm -f /tmp/test_* 2>/dev/null || true
+rm -f /tmp/simple_test* 2>/dev/null || true
+rm -f /tmp/quick_test* 2>/dev/null || true
 echo -e "${GREEN}   ✅ Temporary files cleaned${NC}"
 
 # Step 12: Remove any remaining Firefox profiles
@@ -153,15 +159,33 @@ fi
 # Step 13: Clean up any remaining processes
 echo -e "${YELLOW}13. Final process cleanup...${NC}"
 # Kill any remaining processes more aggressively
-for proc in firefox geckodriver Xvfb; do
+for proc in firefox geckodriver Xvfb python3.*funpay; do
     if pgrep -f "$proc" >/dev/null; then
         pkill -9 -f "$proc" 2>/dev/null || true
         echo -e "${GREEN}   ✅ Killed remaining $proc processes${NC}"
     fi
 done
 
-# Step 14: Remove any cron jobs (if any were created)
-echo -e "${YELLOW}14. Checking for cron jobs...${NC}"
+# Additional cleanup for enhanced features
+pkill -9 -f "funpay_boost_ultimate" 2>/dev/null || true
+pkill -9 -f "simple_test" 2>/dev/null || true
+pkill -9 -f "test_enhanced" 2>/dev/null || true
+
+# Step 14: Clean up project directory files (optional)
+echo -e "${YELLOW}14. Cleaning up project directory files...${NC}"
+read -p "Do you want to remove test files from project directory? (y/N): " CLEAN_PROJECT
+if [[ "$CLEAN_PROJECT" =~ ^[Yy]$ ]]; then
+    # Find and remove test files
+    find /root -name "simple_test.py" -delete 2>/dev/null || true
+    find /root -name "test_enhanced_compatibility.py" -delete 2>/dev/null || true
+    find /root -name "check_system_status.sh" -delete 2>/dev/null || true
+    echo -e "${GREEN}   ✅ Project test files cleaned${NC}"
+else
+    echo -e "${CYAN}   ℹ️ Project files left unchanged${NC}"
+fi
+
+# Step 15: Remove any cron jobs (if any were created)
+echo -e "${YELLOW}15. Checking for cron jobs...${NC}"
 if crontab -l 2>/dev/null | grep -q "funpay"; then
     echo -e "${YELLOW}   Found FunPay cron jobs, removing...${NC}"
     crontab -l 2>/dev/null | grep -v "funpay" | crontab -

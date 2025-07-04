@@ -85,8 +85,10 @@ fi
 # Step 6: Kill any running processes
 echo -e "${YELLOW}6. Killing any running FunPay processes...${NC}"
 pkill -f "funpay" 2>/dev/null || echo "   No FunPay processes found"
-pkill -f "firefox.*funpay" 2>/dev/null || echo "   No Firefox processes found"
-pkill -f "geckodriver" 2>/dev/null || echo "   No geckodriver processes found"
+pkill -f "chrome.*funpay" 2>/dev/null || echo "   No Chrome processes found"
+pkill -f "chromedriver" 2>/dev/null || echo "   No chromedriver processes found"
+pkill -f "firefox.*funpay" 2>/dev/null || echo "   No Firefox processes found (legacy)"
+pkill -f "geckodriver" 2>/dev/null || echo "   No geckodriver processes found (legacy)"
 pkill -f "Xvfb.*99" 2>/dev/null || echo "   No Xvfb :99 processes found"
 pkill -f "Xvfb.*111" 2>/dev/null || echo "   No Xvfb :111 processes found"
 pkill -f "funpay_boost_ultimate" 2>/dev/null || echo "   No ultimate script processes found"
@@ -140,6 +142,7 @@ echo -e "${YELLOW}11. Cleaning up temporary files...${NC}"
 rm -f /tmp/.X99-lock 2>/dev/null || true
 rm -f /tmp/.X111-lock 2>/dev/null || true
 rm -f /tmp/.X*-lock 2>/dev/null || true
+rm -f /tmp/chromedriver* 2>/dev/null || true
 rm -f /tmp/geckodriver* 2>/dev/null || true
 rm -f /tmp/funpay* 2>/dev/null || true
 rm -f /tmp/test_* 2>/dev/null || true
@@ -147,8 +150,8 @@ rm -f /tmp/simple_test* 2>/dev/null || true
 rm -f /tmp/quick_test* 2>/dev/null || true
 echo -e "${GREEN}   ✅ Temporary files cleaned${NC}"
 
-# Step 12: Remove any remaining Firefox profiles
-echo -e "${YELLOW}12. Cleaning Firefox profiles...${NC}"
+# Step 12: Remove any remaining browser profiles
+echo -e "${YELLOW}12. Cleaning browser profiles...${NC}"
 if [[ -d /home/funpay/.mozilla ]]; then
     rm -rf /home/funpay/.mozilla
     echo -e "${GREEN}   ✅ Firefox profiles removed${NC}"
@@ -156,10 +159,17 @@ else
     echo -e "${CYAN}   ℹ️ Firefox profiles not found${NC}"
 fi
 
+if [[ -d /home/funpay/.config/google-chrome ]]; then
+    rm -rf /home/funpay/.config/google-chrome
+    echo -e "${GREEN}   ✅ Chrome profiles removed${NC}"
+else
+    echo -e "${CYAN}   ℹ️ Chrome profiles not found${NC}"
+fi
+
 # Step 13: Clean up any remaining processes
 echo -e "${YELLOW}13. Final process cleanup...${NC}"
 # Kill any remaining processes more aggressively
-for proc in firefox geckodriver Xvfb python3.*funpay; do
+for proc in chrome chromedriver firefox geckodriver Xvfb python3.*funpay; do
     if pgrep -f "$proc" >/dev/null; then
         pkill -9 -f "$proc" 2>/dev/null || true
         echo -e "${GREEN}   ✅ Killed remaining $proc processes${NC}"
@@ -169,6 +179,8 @@ done
 # Additional cleanup for enhanced features
 pkill -9 -f "funpay_boost_ultimate" 2>/dev/null || true
 pkill -9 -f "simple_test" 2>/dev/null || true
+pkill -9 -f "simple_chrome_test" 2>/dev/null || true
+pkill -9 -f "funpay_simple" 2>/dev/null || true
 pkill -9 -f "test_enhanced" 2>/dev/null || true
 
 # Step 14: Clean up project directory files (optional)
@@ -177,6 +189,8 @@ read -p "Do you want to remove test files from project directory? (y/N): " CLEAN
 if [[ "$CLEAN_PROJECT" =~ ^[Yy]$ ]]; then
     # Find and remove test files
     find /root -name "simple_test.py" -delete 2>/dev/null || true
+    find /root -name "simple_chrome_test.py" -delete 2>/dev/null || true
+    find /root -name "funpay_simple.py" -delete 2>/dev/null || true
     find /root -name "test_enhanced_compatibility.py" -delete 2>/dev/null || true
     find /root -name "check_system_status.sh" -delete 2>/dev/null || true
     echo -e "${GREEN}   ✅ Project test files cleaned${NC}"
@@ -251,8 +265,10 @@ echo "   • Configuration directory (/etc/funpay)"
 echo "   • Log directory (/var/log/funpay)"
 echo "   • Service user (funpay)"
 echo "   • Management script (/usr/local/bin/funpay-boost)"
-echo "   • All running processes"
-echo "   • Temporary files"
+echo "   • All running processes (Chrome, ChromeDriver, Xvfb)"
+echo "   • Browser profiles (Chrome, Firefox legacy)"
+echo "   • Temporary files (ChromeDriver, GeckoDriver legacy)"
+echo "   • Test files (Chrome and legacy Firefox tests)"
 echo ""
 
 echo -e "${BLUE}Cleanup script completed.${NC}"

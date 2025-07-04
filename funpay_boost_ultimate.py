@@ -17,8 +17,8 @@ import hashlib
 import base64
 from datetime import datetime, timedelta
 from selenium import webdriver
-from selenium.webdriver.firefox.options import Options
-from selenium.webdriver.firefox.service import Service
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -85,12 +85,12 @@ class BrowserStealth:
     
     def __init__(self):
         self.user_agents = [
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/115.0",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/116.0",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/117.0",
-            "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0",
-            "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0",
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/115.0"
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         ]
         
         self.screen_resolutions = [
@@ -111,46 +111,37 @@ class BrowserStealth:
         """Get a random language preference"""
         return random.choice(self.languages)
     
-    def apply_stealth_settings(self, firefox_options):
-        """Apply comprehensive stealth settings to Firefox"""
+    def apply_stealth_settings(self, chrome_options):
+        """Apply comprehensive stealth settings to Chrome"""
         width, height = self.get_random_resolution()
         user_agent = self.get_random_user_agent()
         language = self.get_random_language()
         
-        # Basic stealth (marionette must be enabled for Selenium 4.x)
-        firefox_options.set_preference("general.useragent.override", user_agent)
-        firefox_options.set_preference("dom.webdriver.enabled", False)
-        firefox_options.set_preference("useAutomationExtension", False)
-        
-        # Language and locale
-        firefox_options.set_preference("intl.accept_languages", language)
-        firefox_options.set_preference("intl.locale.requested", "en-US")
-        
-        # Screen and viewport
-        firefox_options.add_argument(f"--width={width}")
-        firefox_options.add_argument(f"--height={height}")
+        # Basic stealth settings
+        chrome_options.add_argument(f"--user-agent={user_agent}")
+        chrome_options.add_argument(f"--window-size={width},{height}")
+        chrome_options.add_argument(f"--lang={language.split(',')[0]}")
         
         # Advanced anti-detection
-        firefox_options.set_preference("privacy.resistFingerprinting", True)
-        firefox_options.set_preference("webgl.disabled", True)
-        firefox_options.set_preference("media.peerconnection.enabled", False)
-        firefox_options.set_preference("geo.enabled", False)
-        firefox_options.set_preference("dom.battery.enabled", False)
-        firefox_options.set_preference("device.sensors.enabled", False)
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        chrome_options.add_experimental_option('useAutomationExtension', False)
         
-        # Memory and performance fingerprinting
-        firefox_options.set_preference("dom.maxHardwareConcurrency", 4)
-        firefox_options.set_preference("dom.w3c_touch_events.enabled", 0)
+        # Performance and fingerprinting protection
+        chrome_options.add_argument("--disable-web-security")
+        chrome_options.add_argument("--disable-features=VizDisplayCompositor")
+        chrome_options.add_argument("--disable-extensions")
+        chrome_options.add_argument("--disable-plugins")
+        chrome_options.add_argument("--disable-images")
+        chrome_options.add_argument("--disable-gpu")
         
-        # Network fingerprinting
-        firefox_options.set_preference("network.http.sendRefererHeader", 2)
-        firefox_options.set_preference("network.http.referer.spoofSource", True)
+        # Memory and resource management
+        chrome_options.add_argument("--memory-pressure-off")
+        chrome_options.add_argument("--max_old_space_size=4096")
         
-        # Canvas fingerprinting protection
-        firefox_options.set_preference("privacy.resistFingerprinting.block_mozAddonManager", True)
-        firefox_options.set_preference("extensions.webextensions.restrictedDomains", "")
-        
-        return firefox_options
+        return chrome_options
     
     def add_stealth_scripts(self, driver):
         """Add JavaScript to further hide automation"""
@@ -469,8 +460,8 @@ class FunPayBooster:
         try:
             # Kill existing processes
             self.kill_processes('Xvfb')
-            self.kill_processes('firefox')
-            self.kill_processes('geckodriver')
+            self.kill_processes('chrome')
+            self.kill_processes('chromedriver')
             
             # Remove lock files
             subprocess.run(['rm', '-f', f'/tmp/.X{self.display_num}-lock'], capture_output=True)
@@ -496,110 +487,65 @@ class FunPayBooster:
             self.logger.error(f"Failed to setup display: {e}")
             return False
     
-    def setup_firefox(self):
-        """Setup Firefox with enhanced Selenium 4.x and Firefox 140.x compatibility"""
+    def setup_chrome(self):
+        """Setup Chrome with enhanced Selenium 4.x compatibility"""
         try:
             if not self.setup_display():
                 return False
             
-            # Firefox options with enhanced compatibility
-            firefox_options = Options()
+            # Chrome options with enhanced compatibility
+            chrome_options = Options()
             
             # Apply stealth settings first
-            firefox_options = self.browser_stealth.apply_stealth_settings(firefox_options)
+            chrome_options = self.browser_stealth.apply_stealth_settings(chrome_options)
             
             # Enhanced headless options for Selenium 4.x
-            firefox_options.add_argument("--headless")
-            firefox_options.add_argument("--no-sandbox")
-            firefox_options.add_argument("--disable-dev-shm-usage")
-            firefox_options.add_argument("--disable-gpu")
-            firefox_options.add_argument("--disable-software-rasterizer")
-            firefox_options.add_argument("--disable-background-timer-throttling")
-            firefox_options.add_argument("--disable-backgrounding-occluded-windows")
-            firefox_options.add_argument("--disable-renderer-backgrounding")
-            firefox_options.add_argument("--disable-features=TranslateUI")
-            firefox_options.add_argument("--disable-ipc-flooding-protection")
+            chrome_options.add_argument("--headless")
+            chrome_options.add_argument("--no-sandbox")
+            chrome_options.add_argument("--disable-dev-shm-usage")
+            chrome_options.add_argument("--disable-gpu")
+            chrome_options.add_argument("--disable-software-rasterizer")
+            chrome_options.add_argument("--disable-background-timer-throttling")
+            chrome_options.add_argument("--disable-backgrounding-occluded-windows")
+            chrome_options.add_argument("--disable-renderer-backgrounding")
+            chrome_options.add_argument("--disable-features=TranslateUI")
+            chrome_options.add_argument("--disable-ipc-flooding-protection")
             
-            # Selenium 4.x and Firefox 140.x specific settings
-            firefox_options.set_preference("marionette.enabled", True)
-            firefox_options.set_preference("marionette.port", 0)  # Auto-assign port
-            firefox_options.set_preference("remote.enabled", True)
-            firefox_options.set_preference("remote.force-local", True)
-            firefox_options.set_preference("fission.autostart", False)  # Disable site isolation
-            
-            # Enhanced performance optimizations
-            firefox_options.set_preference("dom.ipc.processCount", 1)
-            firefox_options.set_preference("security.sandbox.content.level", 0)
-            firefox_options.set_preference("browser.cache.disk.enable", False)
-            firefox_options.set_preference("browser.cache.memory.enable", False)
-            firefox_options.set_preference("browser.cache.offline.enable", False)
-            firefox_options.set_preference("network.http.use-cache", False)
-            firefox_options.set_preference("permissions.default.image", 2)  # Block images
-            firefox_options.set_preference("javascript.enabled", True)
-            
-            # Memory and resource management
-            firefox_options.set_preference("browser.sessionhistory.max_total_viewers", 0)
-            firefox_options.set_preference("browser.sessionstore.max_tabs_undo", 0)
-            firefox_options.set_preference("browser.sessionstore.max_windows_undo", 0)
-            firefox_options.set_preference("media.volume_scale", "0.0")
-            firefox_options.set_preference("media.autoplay.enabled", False)
-            
-            # Enhanced timeout settings for stability
-            base_timeout = random.randint(45, 60)  # Increased for Firefox 140.x
-            firefox_options.set_preference("dom.max_script_run_time", base_timeout)
-            firefox_options.set_preference("network.http.connection-timeout", base_timeout)
-            firefox_options.set_preference("network.http.response.timeout", base_timeout)
-            firefox_options.set_preference("network.http.request.timeout", base_timeout)
-            firefox_options.set_preference("network.websocket.timeout.ping.request", base_timeout)
-            
-            # Disable unnecessary features for better performance
-            firefox_options.set_preference("browser.startup.homepage_override.mstone", "ignore")
-            firefox_options.set_preference("datareporting.policy.dataSubmissionEnabled", False)
-            firefox_options.set_preference("toolkit.telemetry.enabled", False)
-            firefox_options.set_preference("browser.crashReports.unsubmittedCheck.enabled", False)
-            firefox_options.set_preference("app.update.enabled", False)
-            firefox_options.set_preference("extensions.update.enabled", False)
-            firefox_options.set_preference("browser.newtabpage.enabled", False)
-            firefox_options.set_preference("browser.newtab.preload", False)
-            
-            # Enhanced service configuration for GeckoDriver 0.36.0
+            # Enhanced service configuration for ChromeDriver
             service_args = [
-                '--log', 'warn',  # Reduced logging
-                '--marionette-port', '0',  # Auto-assign port
-                '--websocket-port', '0',  # Auto-assign WebSocket port
-                '--allow-hosts', 'localhost',
-                '--allow-origins', 'http://localhost'
+                '--log-level=3',  # Reduced logging
+                '--silent'
             ]
             
-            # Try multiple GeckoDriver paths
-            geckodriver_paths = [
-                '/usr/local/bin/geckodriver',
-                '/usr/bin/geckodriver',
-                'geckodriver'
+            # Try multiple ChromeDriver paths
+            chromedriver_paths = [
+                '/usr/local/bin/chromedriver',
+                '/usr/bin/chromedriver',
+                'chromedriver'
             ]
             
             service = None
-            for path in geckodriver_paths:
+            for path in chromedriver_paths:
                 try:
-                    if os.path.exists(path) or path == 'geckodriver':
+                    if os.path.exists(path) or path == 'chromedriver':
                         service = Service(executable_path=path, service_args=service_args)
-                        self.logger.info(f"Using GeckoDriver at: {path}")
+                        self.logger.info(f"Using ChromeDriver at: {path}")
                         break
                 except Exception as e:
                     self.logger.debug(f"Failed to create service with {path}: {e}")
                     continue
             
             if not service:
-                self.logger.error("GeckoDriver not found in any expected location")
+                self.logger.error("ChromeDriver not found in any expected location")
                 return False
             
-            # Enhanced Firefox startup with better error handling
-            def _start_firefox():
+            # Enhanced Chrome startup with better error handling
+            def _start_chrome():
                 try:
-                    self.logger.info("Starting Firefox with enhanced compatibility settings...")
+                    self.logger.info("Starting Chrome with enhanced compatibility settings...")
                     
                     # Create driver with enhanced configuration
-                    driver = webdriver.Firefox(service=service, options=firefox_options)
+                    driver = webdriver.Chrome(service=service, options=chrome_options)
                     
                     # Set enhanced timeouts for Selenium 4.x
                     driver.set_page_load_timeout(90)  # Increased for stability
@@ -609,20 +555,20 @@ class FunPayBooster:
                     width, height = self.browser_stealth.get_random_resolution()
                     driver.set_window_size(width, height)
                     
-                    self.logger.info("Firefox driver created successfully")
+                    self.logger.info("Chrome driver created successfully")
                     return driver
                     
                 except Exception as e:
-                    self.logger.error(f"Firefox startup failed: {e}")
+                    self.logger.error(f"Chrome startup failed: {e}")
                     raise e
             
             # Use error recovery with increased retries
             self.driver = self.error_recovery.execute_with_retry(
-                _start_firefox, "firefox_startup"
+                _start_chrome, "chrome_startup"
             )
             
             if not self.driver:
-                self.logger.error("Failed to start Firefox after all retries")
+                self.logger.error("Failed to start Chrome after all retries")
                 return False
             
             # Apply stealth scripts after successful startup
@@ -632,28 +578,28 @@ class FunPayBooster:
             except Exception as e:
                 self.logger.warning(f"Failed to apply stealth scripts: {e}")
             
-            # Verify Firefox is working with a simple test
+            # Verify Chrome is working with a simple test
             try:
-                self.logger.info("Verifying Firefox functionality...")
-                test_html = "data:text/html,<html><body><h1>Firefox Compatibility Test</h1><p>Selenium 4.x + Firefox 140.x</p></body></html>"
+                self.logger.info("Verifying Chrome functionality...")
+                test_html = "data:text/html,<html><body><h1>Chrome Compatibility Test</h1><p>Selenium 4.x + Chrome</p></body></html>"
                 self.driver.get(test_html)
                 
-                if "Firefox Compatibility Test" in self.driver.page_source:
-                    self.logger.info("✅ Firefox verification successful")
+                if "Chrome Compatibility Test" in self.driver.page_source:
+                    self.logger.info("✅ Chrome verification successful")
                 else:
-                    self.logger.warning("⚠️ Firefox verification unclear")
+                    self.logger.warning("⚠️ Chrome verification unclear")
                     
             except Exception as e:
-                self.logger.warning(f"Firefox verification error: {e}")
+                self.logger.warning(f"Chrome verification error: {e}")
             
             # Add human-like delay after startup
             self.rate_limiter.add_human_delay(3.0, 6.0)
             
-            self.logger.info("✅ Firefox driver initialized successfully with enhanced compatibility")
+            self.logger.info("✅ Chrome driver initialized successfully with enhanced compatibility")
             return True
             
         except Exception as e:
-            self.logger.error(f"Failed to setup Firefox: {e}")
+            self.logger.error(f"Failed to setup Chrome: {e}")
             return False
     
     def try_login_with_credentials(self):
@@ -953,9 +899,9 @@ class FunPayBooster:
                 self.logger.error("Failed to get user credentials")
                 return False
         
-        # Setup Firefox
-        if not self.setup_firefox():
-            self.logger.error("Failed to setup Firefox")
+        # Setup Chrome
+        if not self.setup_chrome():
+            self.logger.error("Failed to setup Chrome")
             return False
         
         # Setup authentication
@@ -1032,7 +978,7 @@ class FunPayBooster:
                         self.logger.warning("Too many consecutive errors, attempting recovery...")
                         
                         recovery_result = self.error_recovery.execute_with_retry(
-                            self.restart_firefox, "firefox_recovery"
+                            self.restart_chrome, "chrome_recovery"
                         )
                         
                         if recovery_result:
@@ -1064,10 +1010,10 @@ class FunPayBooster:
         
         return True
     
-    def restart_firefox(self):
-        """Restart Firefox driver with enhanced recovery"""
+    def restart_chrome(self):
+        """Restart Chrome driver with enhanced recovery"""
         try:
-            self.logger.info("Restarting Firefox with enhanced recovery...")
+            self.logger.info("Restarting Chrome with enhanced recovery...")
             
             # Cleanup with error recovery
             def _cleanup():
@@ -1079,9 +1025,9 @@ class FunPayBooster:
             
             self.error_recovery.execute_with_retry(_cleanup, "cleanup_operation")
             
-            # Setup Firefox with circuit breaker protection
+            # Setup Chrome with circuit breaker protection
             def _setup_and_auth():
-                if self.setup_firefox():
+                if self.setup_chrome():
                     if self.setup_authentication():
                         return True
                 return False
@@ -1089,18 +1035,18 @@ class FunPayBooster:
             result = self.circuit_breaker.call(_setup_and_auth)
             
             if result:
-                self.logger.info("✅ Firefox restarted successfully with enhanced recovery")
+                self.logger.info("✅ Chrome restarted successfully with enhanced recovery")
                 # Reset error counters on successful restart
                 self.consecutive_errors = 0
-                self.error_recovery.reset_retry_count("firefox_restart")
+                self.error_recovery.reset_retry_count("chrome_restart")
                 self.rate_limiter.reset_adaptive_factor()
                 return True
             else:
-                self.logger.error("❌ Failed to restart Firefox")
+                self.logger.error("❌ Failed to restart Chrome")
                 return False
             
         except Exception as e:
-            self.logger.error(f"Error restarting Firefox: {e}")
+            self.logger.error(f"Error restarting Chrome: {e}")
             return False
     
     def get_status(self):
@@ -1169,8 +1115,8 @@ class FunPayBooster:
                 self.xvfb_process = None
             
             # Kill remaining processes
-            self.kill_processes('firefox')
-            self.kill_processes('geckodriver')
+            self.kill_processes('chrome')
+            self.kill_processes('chromedriver')
             self.kill_processes('Xvfb')
             
             self.logger.info("Cleanup completed")
@@ -1197,7 +1143,7 @@ def main():
         elif args.setup:
             booster.get_user_credentials()
         elif args.test:
-            if booster.setup_firefox():
+            if booster.setup_chrome():
                 if booster.setup_authentication():
                     result = booster.check_boost_status()
                     print(f"Test result: {result}")

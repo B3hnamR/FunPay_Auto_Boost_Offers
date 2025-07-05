@@ -3,11 +3,11 @@
   "bot_token": "",
   "chat_id": "",
   "timezone": "Asia/Tehran",
-  "language": "en",
+  "language": "fa",
   "messages": {
-    "boost_success": "✅ Offers have been boosted!\n📅 Next boost: {next_boost_time}",
-    "boost_failed": "❌ Boost failed!\n🔄 Retry at: {retry_time}",
-    "service_started": "🚀 FunPay Auto Boost service started",
-    "service_stopped": "🛑 FunPay Auto Boost service stopped"
+    "boost_success": "🎉 Boost موفقیت‌آمیز انجام شد!\n📅 زمان فعلی: {current_time}\n⏰ Boost بعدی: {next_boost_time}\n⏳ زمان باقی‌مانده: {time_remaining}",
+    "boost_failed": "⚠️ Boost در انتظار است\n📅 زمان فعلی: {current_time}\n🕐 سایت گفته: {exact_wait_minutes} دقیقه صبر کنید\n⏰ تلاش مجدد: {retry_time}\n⏳ زمان باقی‌مانده: {time_remaining}",
+    "service_started": "🚀 سرویس FunPay Auto Boost شروع شد",
+    "service_stopped": "🛑 سرویس FunPay Auto Boost متوقف شد"
   }
 }

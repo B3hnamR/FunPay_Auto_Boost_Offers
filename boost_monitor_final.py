@@ -162,7 +162,7 @@ class FinalBoostMonitor:
         return False
     
     def parse_boost_failed(self, line):
-        """Detect boost failure from log"""
+        """Detect boost failure from log and extract exact wait time"""
         # Skip network errors (they're not boost failures)
         if self.is_network_error(line):
             return False
@@ -173,13 +173,73 @@ class FinalBoostMonitor:
             r'try.*again.*later',
             r'must.*wait.*hours',
             r'please.*wait.*hours',
-            r'⏳.*wait.*before'
+            r'⏳.*wait.*before',
+            r'please wait (\d+) minutes?',
+            r'wait (\d+) minutes?'
         ]
         
         for pattern in failure_patterns:
             if re.search(pattern, line, re.IGNORECASE):
                 return True
         return False
+    
+    def parse_wait_time_from_log(self, line):
+        """Parse exact wait time from log line with enhanced patterns"""
+        try:
+            import re
+            
+            # Enhanced patterns to match exact wait times from site
+            wait_patterns = [
+                # English patterns - exact matches
+                r'please wait (\d+) minutes?',
+                r'wait (\d+) minutes?',
+                r'try again in (\d+) minutes?',
+                r'cooldown.*?(\d+).*?minutes?',
+                r'boost.*?available.*?(\d+).*?minutes?',
+                r'next.*?boost.*?(\d+).*?minutes?',
+                
+                # Persian/Russian patterns
+                r'подожди (\d+) минут',
+                r'через (\d+) минут',
+                
+                # Generic patterns
+                r'(\d+)\s*minutes?\s*remaining',
+                r'(\d+)\s*min\s*left',
+                r'available.*?(\d+).*?minutes?'
+            ]
+            
+            # Look for minute patterns first
+            for pattern in wait_patterns:
+                match = re.search(pattern, line, re.IGNORECASE)
+                if match:
+                    wait_minutes = int(match.group(1))
+                    self.logger.info(f"🕐 Detected exact wait time: {wait_minutes} minutes from: {line[:100]}...")
+                    return wait_minutes
+            
+            # Look for hour patterns
+            hour_patterns = [
+                r'please wait (\d+) hours?',
+                r'wait (\d+) hours?',
+                r'try again in (\d+) hours?',
+                r'подожди (\d+) час',
+                r'через (\d+) час',
+                r'(\d+)\s*hours?\s*remaining',
+                r'(\d+)\s*hr\s*left'
+            ]
+            
+            for pattern in hour_patterns:
+                match = re.search(pattern, line, re.IGNORECASE)
+                if match:
+                    wait_hours = int(match.group(1))
+                    wait_minutes = wait_hours * 60
+                    self.logger.info(f"🕐 Detected exact wait time: {wait_hours} hours ({wait_minutes} minutes) from: {line[:100]}...")
+                    return wait_minutes
+            
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"Error parsing wait time from log: {e}")
+            return None
     
     def create_event_signature(self, event_type, line_content):
         """Create unique signature for event to prevent duplicates"""
@@ -306,14 +366,23 @@ class FinalBoostMonitor:
                 if self.should_process_event(event_signature, line_timestamp):
                     self.logger.warning(f"Processing boost failure: {line[:80]}...")
                     
-                    # Calculate retry time (3 hours based on site message)
-                    retry_time = datetime.now() + timedelta(hours=3)
+                    # Try to extract exact wait time from the log line
+                    exact_wait_minutes = self.parse_wait_time_from_log(line)
                     
-                    # Send notification
+                    if exact_wait_minutes:
+                        # Use exact time from site
+                        retry_time = datetime.now() + timedelta(minutes=exact_wait_minutes)
+                        self.logger.info(f"🎯 Using exact wait time from site: {exact_wait_minutes} minutes")
+                    else:
+                        # Fallback to default 3 hours
+                        retry_time = datetime.now() + timedelta(hours=3)
+                        self.logger.info("⚠️ No exact wait time found, using default 3 hours")
+                    
+                    # Send notification with exact timing
                     if self.notifier.is_enabled():
-                        success = self.notifier.notify_boost_failed(retry_time)
+                        success = self.notifier.notify_boost_failed(retry_time, exact_wait_minutes)
                         if success:
-                            self.logger.info("⚠️ Boost failure notification sent")
+                            self.logger.info("⚠️ Boost failure notification sent with exact timing")
                             self.last_notification_time = datetime.now()
                             self.save_state()
                         else:

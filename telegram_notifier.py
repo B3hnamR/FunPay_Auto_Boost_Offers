@@ -50,14 +50,16 @@ class TelegramNotifier:
                self.config.get('chat_id')
     
     def convert_to_iran_time(self, utc_time):
-        """Convert time to Iran timezone"""
+        """Convert time to Iran timezone with detailed formatting"""
         try:
             if isinstance(utc_time, str):
                 utc_time = datetime.fromisoformat(utc_time)
             
-            # If no timezone, assume UTC
+            # If no timezone, assume local time
             if utc_time.tzinfo is None:
-                utc_time = pytz.UTC.localize(utc_time)
+                # Assume it's already local time (Iran time)
+                iran_tz = pytz.timezone('Asia/Tehran')
+                utc_time = iran_tz.localize(utc_time)
             
             # Convert to Iran time
             iran_tz = pytz.timezone('Asia/Tehran')
@@ -67,6 +69,40 @@ class TelegramNotifier:
         except Exception as e:
             self.logger.error(f"Error converting time: {e}")
             return str(utc_time)
+    
+    def calculate_time_remaining(self, target_time):
+        """Calculate remaining time until target"""
+        try:
+            if isinstance(target_time, str):
+                target_time = datetime.fromisoformat(target_time)
+            
+            # If no timezone, assume local time
+            if target_time.tzinfo is None:
+                iran_tz = pytz.timezone('Asia/Tehran')
+                target_time = iran_tz.localize(target_time)
+            
+            # Current time in Iran
+            iran_tz = pytz.timezone('Asia/Tehran')
+            now = datetime.now(iran_tz)
+            
+            # Calculate difference
+            diff = target_time - now
+            
+            if diff.total_seconds() <= 0:
+                return "آماده برای boost"
+            
+            total_minutes = int(diff.total_seconds() / 60)
+            hours = total_minutes // 60
+            minutes = total_minutes % 60
+            
+            if hours > 0:
+                return f"{hours} ساعت و {minutes} دقیقه"
+            else:
+                return f"{minutes} دقیقه"
+                
+        except Exception as e:
+            self.logger.error(f"Error calculating time remaining: {e}")
+            return "نامشخص"
     
     def send_message(self, message):
         """Send message to telegram"""
@@ -100,18 +136,19 @@ class TelegramNotifier:
             return False
     
     def notify_boost_success(self, next_boost_time):
-        """Notify successful boost"""
+        """Notify successful boost with detailed timing"""
         try:
             # Convert next boost time to Iran time
             iran_time = self.convert_to_iran_time(next_boost_time)
+            time_remaining = self.calculate_time_remaining(next_boost_time)
+            current_time = self.convert_to_iran_time(datetime.now())
             
-            # Get message from configuration
-            message_template = self.config.get('messages', {}).get(
-                'boost_success', 
-                "✅ Offers have been boosted!\n📅 Next boost: {next_boost_time}"
-            )
-            
-            message = message_template.format(next_boost_time=iran_time)
+            # Enhanced message with more details
+            message = f"🎉 <b>Boost موفقیت‌آمیز انجام شد!</b>\n\n"
+            message += f"📅 <b>زمان فعلی:</b> {current_time}\n"
+            message += f"⏰ <b>Boost بعدی:</b> {iran_time}\n"
+            message += f"⏳ <b>زمان باقی‌مانده:</b> {time_remaining}\n\n"
+            message += f"✅ سیستم به طور خودکار در زمان مقرر boost بعدی را انجام خواهد داد"
             
             return self.send_message(message)
             
@@ -119,17 +156,27 @@ class TelegramNotifier:
             self.logger.error(f"Error notifying boost success: {e}")
             return False
     
-    def notify_boost_failed(self, retry_time):
-        """Notify boost failure"""
+    def notify_boost_failed(self, retry_time, exact_wait_minutes=None):
+        """Notify boost failure with exact timing"""
         try:
             iran_time = self.convert_to_iran_time(retry_time)
+            time_remaining = self.calculate_time_remaining(retry_time)
+            current_time = self.convert_to_iran_time(datetime.now())
             
-            message_template = self.config.get('messages', {}).get(
-                'boost_failed',
-                "❌ Boost failed!\n🔄 Retry at: {retry_time}"
-            )
+            # Enhanced message with exact timing
+            message = f"⚠️ <b>Boost در انتظار است</b>\n\n"
+            message += f"📅 <b>زمان فعلی:</b> {current_time}\n"
             
-            message = message_template.format(retry_time=iran_time)
+            if exact_wait_minutes:
+                message += f"🕐 <b>سایت گفته:</b> {exact_wait_minutes} دقیقه صبر کنید\n"
+            
+            message += f"⏰ <b>تلاش مجدد:</b> {iran_time}\n"
+            message += f"⏳ <b>زمان باقی‌مانده:</b> {time_remaining}\n\n"
+            
+            if exact_wait_minutes and exact_wait_minutes <= 30:
+                message += f"🎯 زمان انتظار کوتاه است - به زودی boost انجام می‌شود"
+            else:
+                message += f"💤 سیستم منتظر می‌ماند و در زمان مقرر تلاش خواهد کرد"
             
             return self.send_message(message)
             

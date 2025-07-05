@@ -868,7 +868,8 @@ class FunPayBooster:
             # First, check if there's a wait message and parse the time
             wait_minutes = self.parse_wait_time_from_page()
             if wait_minutes is not None:
-                self.logger.info(f"⏳ Must wait {wait_minutes} minutes before next boost")
+                self.logger.info(f"🕐 Site says: Please wait {wait_minutes} minutes before next boost")
+                self.logger.info(f"⏳ Exact wait time detected: {wait_minutes} minutes")
                 return "wait"
             
             # Look for boost button with circuit breaker protection

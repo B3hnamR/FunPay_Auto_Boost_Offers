@@ -22,7 +22,7 @@ class FinalBoostMonitor:
         self.last_boost_time = None
         self.last_notification_time = None
         self.processed_events = {}  # Track processed events with timestamps
-        self.notification_cooldown = 600  # 10 minutes cooldown between notifications
+        self.notification_cooldown = 180  # 3 minutes cooldown between notifications
         self.event_window = 300  # 5 minutes window for grouping similar events
         
         # Setup logging

@@ -765,8 +765,82 @@ class FunPayBooster:
         
         return None
     
+    def parse_wait_time_from_page(self):
+        """Parse wait time from page content and update config accordingly"""
+        try:
+            page_source = self.driver.page_source
+            
+            # Look for "Please wait X minutes" or similar patterns
+            import re
+            
+            # Patterns to match wait times
+            wait_patterns = [
+                r'please wait (\d+) minutes?',
+                r'wait (\d+) minutes?',
+                r'подожди (\d+) минут',
+                r'через (\d+) минут',
+                r'cooldown.*?(\d+).*?minutes?',
+                r'try again.*?(\d+).*?minutes?'
+            ]
+            
+            for pattern in wait_patterns:
+                match = re.search(pattern, page_source, re.IGNORECASE)
+                if match:
+                    wait_minutes = int(match.group(1))
+                    self.logger.info(f"🕐 Site says: Please wait {wait_minutes} minutes")
+                    
+                    # Calculate next boost time based on site's message
+                    next_boost_time = datetime.now() + timedelta(minutes=wait_minutes)
+                    
+                    # Update config with accurate timing
+                    # Calculate when the last boost actually happened
+                    last_boost_time = next_boost_time - timedelta(hours=self.config.get('boost_interval', 3))
+                    
+                    self.config['last_boost'] = last_boost_time.isoformat()
+                    self.save_config()
+                    
+                    self.logger.info(f"📅 Updated last boost time to: {last_boost_time.strftime('%Y-%m-%d %H:%M:%S')}")
+                    self.logger.info(f"📅 Next boost will be at: {next_boost_time.strftime('%Y-%m-%d %H:%M:%S')}")
+                    
+                    return wait_minutes
+            
+            # Look for "hours" patterns
+            hour_patterns = [
+                r'please wait (\d+) hours?',
+                r'wait (\d+) hours?',
+                r'подожди (\d+) час',
+                r'через (\d+) час'
+            ]
+            
+            for pattern in hour_patterns:
+                match = re.search(pattern, page_source, re.IGNORECASE)
+                if match:
+                    wait_hours = int(match.group(1))
+                    wait_minutes = wait_hours * 60
+                    self.logger.info(f"🕐 Site says: Please wait {wait_hours} hours ({wait_minutes} minutes)")
+                    
+                    # Calculate next boost time based on site's message
+                    next_boost_time = datetime.now() + timedelta(hours=wait_hours)
+                    
+                    # Update config with accurate timing
+                    last_boost_time = next_boost_time - timedelta(hours=self.config.get('boost_interval', 3))
+                    
+                    self.config['last_boost'] = last_boost_time.isoformat()
+                    self.save_config()
+                    
+                    self.logger.info(f"📅 Updated last boost time to: {last_boost_time.strftime('%Y-%m-%d %H:%M:%S')}")
+                    self.logger.info(f"📅 Next boost will be at: {next_boost_time.strftime('%Y-%m-%d %H:%M:%S')}")
+                    
+                    return wait_minutes
+            
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"Error parsing wait time from page: {e}")
+            return None
+
     def check_boost_status(self):
-        """Check boost status and perform boost if available with enhanced stealth"""
+        """Check boost status and perform boost if available with enhanced stealth and accurate timing"""
         try:
             self.logger.info("Checking boost status...")
             
@@ -791,12 +865,18 @@ class FunPayBooster:
             self.browser_stealth.simulate_human_behavior(self.driver)
             self.rate_limiter.add_human_delay(1.0, 3.0)
             
+            # First, check if there's a wait message and parse the time
+            wait_minutes = self.parse_wait_time_from_page()
+            if wait_minutes is not None:
+                self.logger.info(f"⏳ Must wait {wait_minutes} minutes before next boost")
+                return "wait"
+            
             # Look for boost button with circuit breaker protection
             def _find_and_click_boost():
                 boost_button = self.find_boost_button()
                 
                 if boost_button:
-                    self.logger.info("���� Boost button found!")
+                    self.logger.info("🎯 Boost button found!")
                     
                     # Scroll to button with human-like behavior
                     self.driver.execute_script(
@@ -814,11 +894,23 @@ class FunPayBooster:
                     response_delay = random.uniform(3.0, 8.0)
                     time.sleep(response_delay)
                     
-                    # Update last boost time
-                    self.config['last_boost'] = datetime.now().isoformat()
-                    self.save_config()
-                    
-                    return "success"
+                    # Check if boost was actually successful by looking for success/wait messages
+                    post_click_wait = self.parse_wait_time_from_page()
+                    if post_click_wait is not None:
+                        # Boost was clicked but site says wait - this means it was successful
+                        next_boost_time = datetime.now() + timedelta(minutes=post_click_wait)
+                        self.logger.info(f"✅ Boost successful! Next boost at: {next_boost_time.strftime('%Y-%m-%d %H:%M:%S')}")
+                        
+                        # Update config with current time as last boost
+                        self.config['last_boost'] = datetime.now().isoformat()
+                        self.save_config()
+                        
+                        return "success"
+                    else:
+                        # Update last boost time anyway
+                        self.config['last_boost'] = datetime.now().isoformat()
+                        self.save_config()
+                        return "success"
                 else:
                     return None
             
@@ -831,19 +923,9 @@ class FunPayBooster:
                 self.logger.warning(f"Circuit breaker prevented boost attempt: {e}")
                 return "circuit_open"
             
-            # Check for wait message with enhanced detection
-            page_source = self.driver.page_source.lower()
-            wait_indicators = [
-                "wait", "подожд", "cooldown", "timeout", "please wait",
-                "try again", "спробуйте", "повторите", "через"
-            ]
-            
-            if any(indicator in page_source for indicator in wait_indicators):
-                self.logger.info("⏳ Must wait before next boost")
-                return "wait"
-            else:
-                self.logger.info("❌ No boost button found")
-                return "no_button"
+            # If no boost button and no wait message, something else is wrong
+            self.logger.info("❌ No boost button found and no wait message detected")
+            return "no_button"
             
         except Exception as e:
             self.logger.error(f"Error checking boost status: {e}")

@@ -71,22 +71,23 @@ class TelegramNotifier:
             return str(utc_time)
     
     def calculate_time_remaining(self, target_time):
-        """Calculate remaining time until target"""
+        """Calculate remaining time until target with better timezone handling"""
         try:
             if isinstance(target_time, str):
                 target_time = datetime.fromisoformat(target_time)
             
-            # If no timezone, assume local time
-            if target_time.tzinfo is None:
-                iran_tz = pytz.timezone('Asia/Tehran')
-                target_time = iran_tz.localize(target_time)
+            # Current time (assume local time is Iran time)
+            now = datetime.now()
             
-            # Current time in Iran
-            iran_tz = pytz.timezone('Asia/Tehran')
-            now = datetime.now(iran_tz)
+            # If target_time has timezone, convert to naive for comparison
+            if target_time.tzinfo is not None:
+                iran_tz = pytz.timezone('Asia/Tehran')
+                target_time = target_time.astimezone(iran_tz).replace(tzinfo=None)
             
             # Calculate difference
             diff = target_time - now
+            
+            self.logger.debug(f"Time calculation: now={now}, target={target_time}, diff={diff.total_seconds()}s")
             
             if diff.total_seconds() <= 0:
                 return "آماده برای boost"

@@ -65,8 +65,10 @@ show_system_status() {
         
         # Show process info
         echo "   Process info:"
-        ps -p "$PID" -o pid,ppid,etime,cmd --no-headers | while read line; do
-            echo "   $line"
+        for p in $PID; do
+            ps -p "$p" -o pid,ppid,etime,cmd --no-headers 2>/dev/null | while read line; do
+                echo "   $line"
+            done
         done
     else
         log_warning "Not running"

@@ -804,24 +804,28 @@ class FunPayBooster:
                     wait_minutes = int(match.group(1))
                     self.logger.info(f"🕐 Site says: Please wait {wait_minutes} minutes")
                     
-                    # Calculate next boost time based on site's message (in UTC)
+                    # Calculate accurate timing based on boost interval instead of site message
                     utc_now = datetime.utcnow()
-                    next_boost_time_utc = utc_now + timedelta(minutes=wait_minutes)
+                    interval_hours = self.config.get('boost_interval', 3)
                     
-                    # Update config with accurate timing
-                    # Calculate when the last boost actually happened (in UTC)
-                    last_boost_time_utc = next_boost_time_utc - timedelta(hours=self.config.get('boost_interval', 3))
+                    # The boost just happened, so last_boost is now
+                    actual_last_boost_utc = utc_now
                     
-                    self.config['last_boost'] = last_boost_time_utc.isoformat()
+                    # Calculate next boost based on our interval (more accurate)
+                    next_boost_time_utc = actual_last_boost_utc + timedelta(hours=interval_hours)
+                    
+                    # Update config with current time as last boost
+                    self.config['last_boost'] = actual_last_boost_utc.isoformat()
                     self.save_config()
                     
                     # Convert to Iran time for logging
                     iran_tz = pytz.timezone('Asia/Tehran')
-                    last_boost_iran = last_boost_time_utc.replace(tzinfo=pytz.UTC).astimezone(iran_tz)
+                    last_boost_iran = actual_last_boost_utc.replace(tzinfo=pytz.UTC).astimezone(iran_tz)
                     next_boost_iran = next_boost_time_utc.replace(tzinfo=pytz.UTC).astimezone(iran_tz)
                     
-                    self.logger.info(f"📅 Updated last boost time to: {last_boost_iran.strftime('%Y-%m-%d %H:%M:%S')} Iran")
-                    self.logger.info(f"📅 Next boost will be at: {next_boost_iran.strftime('%Y-%m-%d %H:%M:%S')} Iran")
+                    self.logger.info(f"📅 Boost completed at: {last_boost_iran.strftime('%Y-%m-%d %H:%M:%S')} Iran")
+                    self.logger.info(f"📅 Next boost scheduled: {next_boost_iran.strftime('%Y-%m-%d %H:%M:%S')} Iran")
+                    self.logger.info(f"🕐 Site says wait {wait_minutes} min, but using our {interval_hours}h interval for accuracy")
                     
                     # Note: Telegram notification will be sent by the calling function
                     # to avoid duplicate messages
@@ -843,23 +847,28 @@ class FunPayBooster:
                     wait_minutes = wait_hours * 60
                     self.logger.info(f"🕐 Site says: Please wait {wait_hours} hours ({wait_minutes} minutes)")
                     
-                    # Calculate next boost time based on site's message (in UTC)
+                    # Calculate accurate timing based on boost interval instead of site message
                     utc_now = datetime.utcnow()
-                    next_boost_time_utc = utc_now + timedelta(hours=wait_hours)
+                    interval_hours = self.config.get('boost_interval', 3)
                     
-                    # Update config with accurate timing
-                    last_boost_time_utc = next_boost_time_utc - timedelta(hours=self.config.get('boost_interval', 3))
+                    # The boost just happened, so last_boost is now
+                    actual_last_boost_utc = utc_now
                     
-                    self.config['last_boost'] = last_boost_time_utc.isoformat()
+                    # Calculate next boost based on our interval (more accurate)
+                    next_boost_time_utc = actual_last_boost_utc + timedelta(hours=interval_hours)
+                    
+                    # Update config with current time as last boost
+                    self.config['last_boost'] = actual_last_boost_utc.isoformat()
                     self.save_config()
                     
                     # Convert to Iran time for logging
                     iran_tz = pytz.timezone('Asia/Tehran')
-                    last_boost_iran = last_boost_time_utc.replace(tzinfo=pytz.UTC).astimezone(iran_tz)
+                    last_boost_iran = actual_last_boost_utc.replace(tzinfo=pytz.UTC).astimezone(iran_tz)
                     next_boost_iran = next_boost_time_utc.replace(tzinfo=pytz.UTC).astimezone(iran_tz)
                     
-                    self.logger.info(f"📅 Updated last boost time to: {last_boost_iran.strftime('%Y-%m-%d %H:%M:%S')} Iran")
-                    self.logger.info(f"📅 Next boost will be at: {next_boost_iran.strftime('%Y-%m-%d %H:%M:%S')} Iran")
+                    self.logger.info(f"📅 Boost completed at: {last_boost_iran.strftime('%Y-%m-%d %H:%M:%S')} Iran")
+                    self.logger.info(f"📅 Next boost scheduled: {next_boost_iran.strftime('%Y-%m-%d %H:%M:%S')} Iran")
+                    self.logger.info(f"🕐 Site says wait {wait_hours} hours, but using our {interval_hours}h interval for accuracy")
                     
                     # Note: Telegram notification will be sent by the calling function
                     # to avoid duplicate messages
@@ -954,8 +963,11 @@ class FunPayBooster:
                         # Send telegram notification for wait (since boost was successful)
                         if self.telegram and self.telegram.is_enabled():
                             try:
-                                self.telegram.notify_boost_failed(next_boost_time_utc, post_click_wait)
-                                self.logger.info("📱 Telegram wait notification sent")
+                                # Use our accurate next boost time instead of site's rounded time
+                                interval_hours = self.config.get('boost_interval', 3)
+                                accurate_next_boost = utc_now + timedelta(hours=interval_hours)
+                                self.telegram.notify_boost_failed(accurate_next_boost, post_click_wait)
+                                self.logger.info("📱 Telegram wait notification sent with accurate timing")
                             except Exception as e:
                                 self.logger.warning(f"Failed to send telegram notification: {e}")
                         

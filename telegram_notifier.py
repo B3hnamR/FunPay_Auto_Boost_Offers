@@ -168,19 +168,27 @@ class TelegramNotifier:
             current_time = self.convert_to_iran_time(datetime.now())
             
             # Enhanced message with exact timing
-            message = f"⚠️ <b>Boost در انتظار است</b>\n\n"
+            message = f"✅ <b>Boost موفقیت‌آمیز انجام شد!</b>\n\n"
             message += f"📅 <b>زمان فعلی:</b> {current_time}\n"
             
             if exact_wait_minutes:
-                message += f"🕐 <b>سایت گفته:</b> {exact_wait_minutes} دقیقه صبر کنید\n"
+                # Convert minutes to hours and minutes for better display
+                if exact_wait_minutes >= 60:
+                    hours = exact_wait_minutes // 60
+                    minutes = exact_wait_minutes % 60
+                    if minutes > 0:
+                        site_time_str = f"{hours} ساعت و {minutes} دقیق��"
+                    else:
+                        site_time_str = f"{hours} ساعت"
+                else:
+                    site_time_str = f"{exact_wait_minutes} دقیقه"
+                
+                message += f"🕐 <b>سایت گفته:</b> {site_time_str} صبر کنید\n"
             
-            message += f"⏰ <b>تلاش مجدد:</b> {iran_time}\n"
+            message += f"⏰ <b>Boost بعدی (دقیق):</b> {iran_time}\n"
             message += f"⏳ <b>زمان باقی‌مانده:</b> {time_remaining}\n\n"
-            
-            if exact_wait_minutes and exact_wait_minutes <= 30:
-                message += f"🎯 زمان انتظار کوتاه است - به زودی boost انجام می‌شود"
-            else:
-                message += f"💤 سیستم منتظر می‌ماند و در زمان مقرر تلاش خواهد کرد"
+            message += f"🎯 سیستم بر اساس interval دقیق (3 ساعت) محاسبه می‌کند\n"
+            message += f"✅ در زمان مقرر boost بعدی انجام خواهد شد"
             
             return self.send_message(message)
             

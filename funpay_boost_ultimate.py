@@ -823,12 +823,8 @@ class FunPayBooster:
                     self.logger.info(f"📅 Updated last boost time to: {last_boost_iran.strftime('%Y-%m-%d %H:%M:%S')} Iran")
                     self.logger.info(f"📅 Next boost will be at: {next_boost_iran.strftime('%Y-%m-%d %H:%M:%S')} Iran")
                     
-                    # Send telegram notification for wait
-                    if self.telegram and self.telegram.is_enabled():
-                        try:
-                            self.telegram.notify_boost_failed(next_boost_time_utc, wait_minutes)
-                        except Exception as e:
-                            self.logger.warning(f"Failed to send telegram notification: {e}")
+                    # Note: Telegram notification will be sent by the calling function
+                    # to avoid duplicate messages
                     
                     return wait_minutes
             
@@ -865,12 +861,8 @@ class FunPayBooster:
                     self.logger.info(f"📅 Updated last boost time to: {last_boost_iran.strftime('%Y-%m-%d %H:%M:%S')} Iran")
                     self.logger.info(f"📅 Next boost will be at: {next_boost_iran.strftime('%Y-%m-%d %H:%M:%S')} Iran")
                     
-                    # Send telegram notification for wait
-                    if self.telegram and self.telegram.is_enabled():
-                        try:
-                            self.telegram.notify_boost_failed(next_boost_time_utc, wait_minutes)
-                        except Exception as e:
-                            self.logger.warning(f"Failed to send telegram notification: {e}")
+                    # Note: Telegram notification will be sent by the calling function
+                    # to avoid duplicate messages
                     
                     return wait_minutes
             
@@ -911,6 +903,16 @@ class FunPayBooster:
             if wait_minutes is not None:
                 self.logger.info(f"🕐 Site says: Please wait {wait_minutes} minutes before next boost")
                 self.logger.info(f"⏳ Exact wait time detected: {wait_minutes} minutes")
+                
+                # Send telegram notification for wait
+                if self.telegram and self.telegram.is_enabled():
+                    try:
+                        utc_now = datetime.utcnow()
+                        next_boost_time_utc = utc_now + timedelta(minutes=wait_minutes)
+                        self.telegram.notify_boost_failed(next_boost_time_utc, wait_minutes)
+                    except Exception as e:
+                        self.logger.warning(f"Failed to send telegram notification: {e}")
+                
                 return "wait"
             
             # Look for boost button with circuit breaker protection
@@ -939,29 +941,17 @@ class FunPayBooster:
                     # Check if boost was actually successful by looking for success/wait messages
                     post_click_wait = self.parse_wait_time_from_page()
                     if post_click_wait is not None:
-                        # Boost was clicked but site says wait - this means it was successful
+                        # Boost was clicked and site says wait - this means it was successful
+                        # The parse_wait_time_from_page already sent the telegram notification
+                        # and updated the config, so we just return success
                         utc_now = datetime.utcnow()
-                        next_boost_time_utc = utc_now + timedelta(minutes=post_click_wait)
                         
                         # Convert to Iran time for logging
                         iran_tz = pytz.timezone('Asia/Tehran')
+                        next_boost_time_utc = utc_now + timedelta(minutes=post_click_wait)
                         next_boost_iran = next_boost_time_utc.replace(tzinfo=pytz.UTC).astimezone(iran_tz)
                         
                         self.logger.info(f"✅ Boost successful! Next boost at: {next_boost_iran.strftime('%Y-%m-%d %H:%M:%S')} Iran")
-                        
-                        # Update config with current UTC time as last boost
-                        self.config['last_boost'] = utc_now.isoformat()
-                        self.save_config()
-                        
-                        # Send telegram notification for success
-                        if self.telegram and self.telegram.is_enabled():
-                            try:
-                                # Calculate next boost based on interval
-                                interval_hours = self.config.get('boost_interval', 3)
-                                next_scheduled_boost = utc_now + timedelta(hours=interval_hours)
-                                self.telegram.notify_boost_success(next_scheduled_boost)
-                            except Exception as e:
-                                self.logger.warning(f"Failed to send telegram notification: {e}")
                         
                         return "success"
                     else:
@@ -970,7 +960,7 @@ class FunPayBooster:
                         self.config['last_boost'] = utc_now.isoformat()
                         self.save_config()
                         
-                        # Send telegram notification for success
+                        # Send telegram notification for success (only if no wait message was detected)
                         if self.telegram and self.telegram.is_enabled():
                             try:
                                 interval_hours = self.config.get('boost_interval', 3)

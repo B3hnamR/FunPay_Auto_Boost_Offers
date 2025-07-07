@@ -185,9 +185,9 @@ class TelegramNotifier:
                 
                 message += f"🕐 <b>سایت گفته:</b> {site_time_str} صبر کنید\n"
             
-            message += f"⏰ <b>Boost بعدی (دقیق):</b> {iran_time}\n"
+            message += f"⏰ <b>Boost بعدی:</b> {iran_time}\n"
             message += f"⏳ <b>زمان باقی‌مانده:</b> {time_remaining}\n\n"
-            message += f"🎯 سیستم بر اساس interval دقیق (3 ساعت) محاسبه می‌کند\n"
+            message += f"🎯 سیستم دقیقاً بر اساس زمان سایت محاسبه می‌کند\n"
             message += f"✅ در زمان مقرر boost بعدی انجام خواهد شد"
             
             return self.send_message(message)

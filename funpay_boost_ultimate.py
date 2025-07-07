@@ -942,8 +942,6 @@ class FunPayBooster:
                     post_click_wait = self.parse_wait_time_from_page()
                     if post_click_wait is not None:
                         # Boost was clicked and site says wait - this means it was successful
-                        # The parse_wait_time_from_page already sent the telegram notification
-                        # and updated the config, so we just return success
                         utc_now = datetime.utcnow()
                         
                         # Convert to Iran time for logging
@@ -952,6 +950,14 @@ class FunPayBooster:
                         next_boost_iran = next_boost_time_utc.replace(tzinfo=pytz.UTC).astimezone(iran_tz)
                         
                         self.logger.info(f"✅ Boost successful! Next boost at: {next_boost_iran.strftime('%Y-%m-%d %H:%M:%S')} Iran")
+                        
+                        # Send telegram notification for wait (since boost was successful)
+                        if self.telegram and self.telegram.is_enabled():
+                            try:
+                                self.telegram.notify_boost_failed(next_boost_time_utc, post_click_wait)
+                                self.logger.info("📱 Telegram wait notification sent")
+                            except Exception as e:
+                                self.logger.warning(f"Failed to send telegram notification: {e}")
                         
                         return "success"
                     else:

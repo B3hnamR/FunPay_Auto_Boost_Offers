@@ -49,45 +49,48 @@ class TelegramNotifier:
                self.config.get('bot_token') and \
                self.config.get('chat_id')
     
-    def convert_to_iran_time(self, utc_time):
-        """Convert time to Iran timezone with detailed formatting"""
+    def convert_to_iran_time(self, input_time):
+        """Convert time to Iran timezone with proper UTC handling"""
         try:
-            if isinstance(utc_time, str):
-                utc_time = datetime.fromisoformat(utc_time)
+            if isinstance(input_time, str):
+                input_time = datetime.fromisoformat(input_time)
             
-            # If no timezone, assume local time
-            if utc_time.tzinfo is None:
-                # Assume it's already local time (Iran time)
-                iran_tz = pytz.timezone('Asia/Tehran')
-                utc_time = iran_tz.localize(utc_time)
+            iran_tz = pytz.timezone('Asia/Tehran')
+            
+            # If no timezone info, assume it's UTC (server time)
+            if input_time.tzinfo is None:
+                # Server is in UTC, so treat naive datetime as UTC
+                utc_time = input_time.replace(tzinfo=pytz.UTC)
+            else:
+                utc_time = input_time
             
             # Convert to Iran time
-            iran_tz = pytz.timezone('Asia/Tehran')
             iran_time = utc_time.astimezone(iran_tz)
             
             return iran_time.strftime('%Y-%m-%d %H:%M:%S')
         except Exception as e:
             self.logger.error(f"Error converting time: {e}")
-            return str(utc_time)
+            return str(input_time)
     
     def calculate_time_remaining(self, target_time):
-        """Calculate remaining time until target with better timezone handling"""
+        """Calculate remaining time until target with proper UTC handling"""
         try:
             if isinstance(target_time, str):
                 target_time = datetime.fromisoformat(target_time)
             
-            # Current time (assume local time is Iran time)
-            now = datetime.now()
+            # Current time in UTC (server time)
+            now_utc = datetime.utcnow().replace(tzinfo=pytz.UTC)
             
-            # If target_time has timezone, convert to naive for comparison
-            if target_time.tzinfo is not None:
-                iran_tz = pytz.timezone('Asia/Tehran')
-                target_time = target_time.astimezone(iran_tz).replace(tzinfo=None)
+            # If target_time has no timezone, assume it's UTC
+            if target_time.tzinfo is None:
+                target_utc = target_time.replace(tzinfo=pytz.UTC)
+            else:
+                target_utc = target_time.astimezone(pytz.UTC)
             
-            # Calculate difference
-            diff = target_time - now
+            # Calculate difference in UTC
+            diff = target_utc - now_utc
             
-            self.logger.debug(f"Time calculation: now={now}, target={target_time}, diff={diff.total_seconds()}s")
+            self.logger.debug(f"Time calculation: now_utc={now_utc}, target_utc={target_utc}, diff={diff.total_seconds()}s")
             
             if diff.total_seconds() <= 0:
                 return "آماده برای boost"
